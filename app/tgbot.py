@@ -97,6 +97,9 @@ async def ensure_webhook(base_url: str) -> None:
         return
     url = base_url.rstrip("/") + "/api/telegram/webhook"
     api = f"https://api.telegram.org/bot{tok}"
+    hx = logging.getLogger("httpx")
+    level = hx.level
+    hx.setLevel(logging.WARNING)  # httpx пишет в журнал адрес запроса, а в нём токен бота
     try:
         async with httpx.AsyncClient(timeout=8) as c:
             info = (await c.get(f"{api}/getWebhookInfo")).json().get("result") or {}
@@ -107,4 +110,6 @@ async def ensure_webhook(base_url: str) -> None:
                 log.info("setWebhook: %s", r.get("description") or r.get("ok"))
         _hooked.add(base_url)
     except (httpx.HTTPError, ValueError) as e:  # не получилось — попробуем при следующем запросе
-        log.warning("webhook не настроен: %s", e)
+        log.warning("webhook не настроен: %s", type(e).__name__)
+    finally:
+        hx.setLevel(level)
