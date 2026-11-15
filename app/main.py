@@ -28,13 +28,34 @@ load_dotenv(ROOT / ".env")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 
+SEED_DB = ROOT / "deploy" / "seed.db"
+
+
+def data_dir() -> Path:
+    """Где лежит база. На Vercel файловая система только для чтения, кроме /tmp: туда копируем
+    стартовую базу из deploy/seed.db (каталог и история цен, без пользователей)."""
+    if os.getenv("DATA_DIR"):
+        return Path(os.environ["DATA_DIR"])
+    if os.getenv("VERCEL"):
+        d = Path("/tmp/umnyi-shoping")
+        d.mkdir(parents=True, exist_ok=True)
+        if not (d / "shop.db").exists() and SEED_DB.exists():
+            (d / "shop.db").write_bytes(SEED_DB.read_bytes())
+        return d
+    return ROOT / "data"
+
+
+def _make_service() -> Service:
+    return Service(Sources(), data_dir())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    sources = Sources()
-    app.state.service = Service(sources, Path(os.getenv("DATA_DIR", ROOT / "data")))
+    app.state.service = _make_service()
     yield
-    await sources.aclose()
+    await app.state.service.src.aclose()
     app.state.service.db.db.close()
+    app.state.service = None
 
 
 app = FastAPI(
@@ -50,6 +71,8 @@ app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_credentials=Tru
 
 
 def svc() -> Service:
+    if not getattr(app.state, "service", None):  # хостинг может не вызвать lifespan — создаём при первом запросе
+        app.state.service = _make_service()
     return app.state.service
 
 
