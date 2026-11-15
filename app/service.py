@@ -43,11 +43,12 @@ def offer_out(o: src.Offer) -> OfferOut:
 
 
 def _sort(offers: list[src.Offer], sort: str) -> list[src.Offer]:
+    rub = lambda o: o.currency != "RUB"  # noqa: E731 — цены в разных валютах между собой не сравниваем
     if sort == "trust":
-        return sorted(offers, key=lambda o: (-o.trusted, -o.trust_score, o.price))
+        return sorted(offers, key=lambda o: (-o.trusted, -o.trust_score, rub(o), o.price))
     if sort == "sold":
-        return sorted(offers, key=lambda o: (-o.sold, o.price))
-    return sorted(offers, key=lambda o: (not o.trusted, o.price))  # надёжные дешёвые — первыми
+        return sorted(offers, key=lambda o: (-o.sold, rub(o), o.price))
+    return sorted(offers, key=lambda o: (not o.trusted, rub(o), o.price))  # надёжные дешёвые в рублях — первыми
 
 
 class Service:
@@ -143,7 +144,7 @@ class Service:
                if (not kinds or o.kind in kinds)
                and (not platforms or o.platform in platforms)
                and (not stores or o.store in stores)
-               and (max_price is None or o.price <= max_price)
+               and (max_price is None or (o.currency == "RUB" and o.price <= max_price))  # бюджет — в рублях
                and (not trusted_only or o.trusted)]
         res = _sort(res, sort)[:limit]
         if game and game.steam_review_pct is None:

@@ -49,8 +49,6 @@ def handler(request: httpx.Request) -> httpx.Response:
     if "cheapshark.com/api/1.0/stores" in url:
         return httpx.Response(200, json=[{"storeID": "1", "storeName": "Steam", "isActive": 1},
                                          {"storeID": "7", "storeName": "GOG", "isActive": 1}])
-    if "cbr-xml-daily" in url:
-        return httpx.Response(200, json={"Valute": {"USD": {"Value": 80.0}}})
     if "plati.io" in url and STATE["plati_down"]:
         return httpx.Response(503)
     if "plati.io" in url:
@@ -204,13 +202,19 @@ class OfficialStoresTest(Base):
         CHEAP_DEALS.clear()
         await super().asyncTearDown()
 
-    async def test_official_offers_in_rub(self):
+    async def test_official_offers_in_usd(self):
         res = await self.svc.search("elden ring", kinds=["магазин"])
-        self.assertEqual([(o.store, o.price) for o in res.offers], [("GOG", 1600), ("Steam", 4799)])
+        self.assertEqual([(o.store, o.price, o.currency) for o in res.offers], [("GOG", 20.0, "USD"), ("Steam", 59.99, "USD")])
         gog = res.offers[0]
-        self.assertEqual((gog.id, gog.platform, gog.old_price, gog.region), ("gog:1245620", "GOG", 3200, "GLOBAL"))
+        self.assertEqual((gog.id, gog.platform, gog.old_price, gog.region), ("gog:1245620", "GOG", 40.0, "GLOBAL"))
         self.assertEqual(res.matched, 7)
         self.assertEqual(res.facets.kinds["магазин"], 2)
+
+    async def test_rubles_and_dollars_not_mixed(self):
+        res = await self.svc.search("elden ring", kinds=["ключ", "гифт", "магазин"], trusted_only=True)
+        self.assertEqual([o.currency for o in res.offers], ["RUB"] * 3 + ["USD"] * 2)  # $20 не «дешевле» 1700 ₽
+        res = await self.svc.search("elden ring", kinds=["магазин"], max_price=1000)
+        self.assertEqual(res.offers, [])  # бюджет в рублях к долларовым ценам не применяется
 
     async def test_similar(self):
         await self.svc.search("elden ring")
@@ -219,10 +223,11 @@ class OfficialStoresTest(Base):
     async def test_catalog_and_deals(self):
         await self.svc.search("elden ring")
         cat = self.svc.catalog(10)
-        self.assertEqual((cat[0].appid, cat[0].best_price, cat[0].official_price), (1245620, 1600, 1600))
+        self.assertEqual((cat[0].appid, cat[0].best_price, cat[0].official_price, cat[0].savings_pct), (1245620, 1700, 20.0, 50))
+        self.assertEqual([d.appid for d in self.svc.deals(5)], [1245620])  # скидка 50% в GOG
         self.assertEqual({s["name"] for s in self.svc.db.stores()}, {"plati.market", "Steam", "GOG"})
         cur = self.svc.current(["plati:1", "gog:1245620"])
-        self.assertEqual(sorted(o.price for o in cur), [1600, 1890])
+        self.assertEqual(sorted((o.price, o.currency) for o in cur), [(20.0, "USD"), (1890, "RUB")])
 
 
 class OfflineTest(Base):
@@ -335,8 +340,8 @@ class SmartAssistantTest(Base):
         finally:
             CHEAP_DEALS.clear()
         self.assertEqual(out.nlu.intent, "compare")
-        self.assertIn("официальных магазинах — от 4 799 ₽", out.answer)
-        self.assertIn("У продавцов дешевле на 3 099 ₽ (65%)", out.answer)  # ключ Xbox 1700 против 4799
+        self.assertIn("У продавцов ELDEN RING от 1 700 ₽", out.answer)
+        self.assertIn("официальных магазинах — от $59.99", out.answer)  # в долларах, без пересчёта
 
     async def test_recommend_from_catalog(self):
         await self.svc.search("elden ring")  # игра попадает в каталог

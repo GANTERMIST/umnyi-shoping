@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { CatalogItem } from '../api'
-import { KIND_LABEL, rub } from '../util'
+import { KIND_LABEL, money, rub } from '../util'
 
 export function GameTile({ g }: { g: CatalogItem }) {
   return (
@@ -10,12 +10,12 @@ export function GameTile({ g }: { g: CatalogItem }) {
         <div className="tile-title">{g.name}</div>
         <div className="tile-price">
           <b>{rub(g.best_price)}</b>
-          {g.best_kind && <span className="muted small"> · {KIND_LABEL[g.best_kind]}</span>}
-          {g.savings_pct ? <span className="save">−{g.savings_pct}%</span> : null}
+          {g.best_kind && <span className="muted small">{KIND_LABEL[g.best_kind].toLowerCase()}</span>}
+          {g.savings_pct ? <span className="save" title="Скидка в официальном магазине">−{g.savings_pct}%</span> : null}
         </div>
         <div className="muted small">
-          {g.official_price ? `офиц. ${rub(g.official_price)} · ` : ''}{g.offers} предл.
-          {g.steam_review_pct != null && ` · ${g.steam_review_pct}% 👍`}
+          {g.official_price ? `официально ${money(g.official_price, 'USD')} / ` : ''}{g.offers} предл.
+          {g.steam_review_pct != null && ` / ${g.steam_review_pct}% отзывов +`}
         </div>
       </div>
     </Link>

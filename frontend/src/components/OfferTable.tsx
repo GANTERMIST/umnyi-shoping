@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { Offer } from '../api'
 import { useApp } from '../store'
-import { delivery, guarantee, KIND_HINT, KIND_LABEL, regionFit, regionText, rub, trustLabel } from '../util'
+import { Heart } from './Icons'
+import { byPrice, delivery, guarantee, KIND_HINT, KIND_LABEL, money, price, regionFit, regionText, trustLabel } from '../util'
 
 type Col = 'price' | 'trust' | 'sold' | 'store' | 'kind'
 
@@ -9,13 +10,12 @@ const COLS: { key: Col; label: string }[] = [
   { key: 'store', label: 'Магазин / продавец' },
   { key: 'kind', label: 'Тип' },
   { key: 'trust', label: 'Надёжность' },
-  { key: 'sold', label: 'Продано' },
   { key: 'price', label: 'Цена' },
 ]
 
 function cmp(a: Offer, b: Offer, col: Col): number {
   switch (col) {
-    case 'price': return a.price - b.price
+    case 'price': return byPrice(a, b)
     case 'trust': return Number(b.trusted) - Number(a.trusted) || b.trust_score - a.trust_score
     case 'sold': return b.sold - a.sold
     case 'store': return a.store.localeCompare(b.store) || a.seller.localeCompare(b.seller)
@@ -35,7 +35,7 @@ export function OfferTable({ offers, appid, onSelect, selected }: {
   const rows = useMemo(() => offers.slice().sort((a, b) => cmp(a, b, sort.col) * sort.dir), [offers, sort])
 
   const head = (c: { key: Col; label: string }) => (
-    <th key={c.key} className={c.key === 'price' || c.key === 'sold' ? 'num' : ''}>
+    <th key={c.key} className={c.key === 'price' ? 'num' : ''}>
       <button className="th-sort" onClick={() => setSort(s => ({ col: c.key, dir: s.col === c.key ? (-s.dir as 1 | -1) : 1 }))}
         aria-label={`Сортировать по колонке «${c.label}»`}>
         {c.label}{sort.col === c.key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
@@ -67,10 +67,10 @@ export function OfferTable({ offers, appid, onSelect, selected }: {
                     <div className="sub">
                       <span className="pill">{o.platform === '?' ? 'Платформа ?' : o.platform}</span>
                       <span className={`region ${fit}`} title="Регион активации из описания продавца">{regionText(o, profile.region)}</span>
-                      <span className="muted">· {delivery(o)}</span>
+                      <span>{delivery(o)}</span>
                     </div>
                     {o.note && <div className="sub muted small">{o.note}</div>}
-                    <div className="sub muted small" title="Условия возврата и гарантии">🛡 {guarantee(o)}</div>
+                    <div className="sub muted small" title="Условия возврата и гарантии">{guarantee(o)}</div>
                   </td>
                   <td>
                     <div>{o.kind === 'магазин' ? o.store : o.seller}</div>
@@ -79,20 +79,22 @@ export function OfferTable({ offers, appid, onSelect, selected }: {
                   <td><span className={`kind k-${o.kind}`} title={KIND_HINT[o.kind]}>{KIND_LABEL[o.kind]}</span></td>
                   <td>
                     <span className={o.trusted ? 'ok' : 'warn'}>{trustLabel(o)}</span>
-                    {o.kind !== 'магазин' && <div className="muted small">+{o.reviews_pos} / −{o.reviews_neg}{o.returns ? ` · возвр. ${o.returns}` : ''}</div>}
+                    {o.kind !== 'магазин' && <div className="muted small">+{o.reviews_pos} / −{o.reviews_neg}{o.returns ? `, возвратов ${o.returns}` : ''}</div>}
+                    {o.kind !== 'магазин' && <div className="muted small">продано {o.sold.toLocaleString('ru-RU')}</div>}
                   </td>
-                  <td className="num">{o.kind === 'магазин' ? '—' : o.sold.toLocaleString('ru-RU')}</td>
                   <td className="num price">
-                    {rub(o.price)}
-                    {o.old_price && <div className="old">{rub(o.old_price)}</div>}
+                    {price(o)}
+                    {o.old_price && <div className="old">{money(o.old_price, o.currency)}</div>}
                   </td>
                   <td className="actions" onClick={e => e.stopPropagation()}>
-                    <button className={`icon ${isFav(o.id) ? 'on' : ''}`} onClick={() => toggleFav(o, appid)}
-                      title={isFav(o.id) ? 'Убрать из избранного' : 'Следить за ценой'} aria-label="Избранное">♥</button>
-                    <label className="cmp" title="Добавить к сравнению">
-                      <input type="checkbox" checked={inCompare(o.id)} onChange={() => setNote(toggleCompare(o))} /> Сравнить
-                    </label>
-                    <a className="btn small" href={o.url} target="_blank" rel="noopener noreferrer">Купить →</a>
+                    <div>
+                      <label className="cmp" title="Добавить к сравнению">
+                        <input type="checkbox" checked={inCompare(o.id)} onChange={() => setNote(toggleCompare(o))} aria-label="Сравнить" />
+                      </label>
+                      <button className={`icon ${isFav(o.id) ? 'on' : ''}`} onClick={() => toggleFav(o, appid)}
+                        title={isFav(o.id) ? 'Убрать из избранного' : 'Следить за ценой'} aria-label="Избранное"><Heart /></button>
+                    </div>
+                    <div><a className="btn small" href={o.url} target="_blank" rel="noopener noreferrer">Купить ↗</a></div>
                   </td>
                 </tr>
               )

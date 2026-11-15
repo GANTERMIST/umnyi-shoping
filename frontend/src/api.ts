@@ -84,6 +84,7 @@ export interface Favorite {
   kind?: string | null
   platform?: string | null
   target_price?: number | null
+  currency?: string
 }
 
 export interface Viewed {

@@ -33,7 +33,7 @@ export default function App() {
     <>
       <header className="topbar">
         <div className="container bar">
-          <Link to="/" className="logo" onClick={close}><span className="mark">УШ</span> Умный Шопинг</Link>
+          <Link to="/" className="logo" onClick={close}><span className="mark" aria-hidden="true" />Умный Шопинг</Link>
           <SearchBox />
           <button className="burger" onClick={() => setOpen(!open)} aria-label="Меню" aria-expanded={open}>☰</button>
           <nav className={open ? 'open' : ''} onClick={close}>
@@ -41,9 +41,9 @@ export default function App() {
             <NavLink to="/assistant">Помощник</NavLink>
             <NavLink to="/compare">Сравнение{compare.length > 0 && <span className="badge">{compare.length}</span>}</NavLink>
             <NavLink to="/favorites">Избранное{(changed > 0 || reached > 0) && <span className="badge hot" title={reached ? 'Достигнута целевая цена' : 'Цена изменилась'}>{reached || changed}</span>}</NavLink>
-            {user ? <NavLink to="/profile">{user.name || 'Профиль'}</NavLink> : <NavLink to="/login">Войти</NavLink>}
+            {user ? <NavLink to="/profile">{user.name || 'Профиль'}</NavLink> : <NavLink to="/login" className="account">Войти</NavLink>}
             <button className="theme" onClick={e => { e.stopPropagation(); setTheme(theme === 'light' ? 'dark' : 'light') }}
-              aria-label="Сменить тему" title="Светлая / тёмная тема">{theme === 'light' ? '☾' : '☀'}</button>
+              aria-label="Сменить тему" title="Светлая / тёмная тема">{theme === 'light' ? 'Тёмная' : 'Светлая'}</button>
           </nav>
         </div>
       </header>
@@ -62,11 +62,11 @@ export default function App() {
         </Routes>
       </main>
       {compare.length > 0 && pathname !== '/compare' && (
-        <Link to="/compare" className="compare-bar">К сравнению: {compare.length} / 4 — Сравнить →</Link>
+        <Link to="/compare" className="compare-bar"><span>К сравнению: {compare.length} / 4</span><b>Сравнить</b></Link>
       )}
       <footer className="container footer muted small">
-        Умный Шопинг · учебный проект УрФУ (ОПД) · цены: Plati.market, официальные магазины через CheapShark, данные игр — Steam.
-        Покупка происходит на сайте продавца.
+        <span>Умный Шопинг, учебный проект УрФУ</span>
+        <span>Цены: Plati.market и официальные магазины через CheapShark. Данные игр: Steam. Покупка на сайте продавца.</span>
       </footer>
     </>
   )

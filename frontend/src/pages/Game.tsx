@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { api, type CatalogItem, type GameCard, type Offer } from '../api'
 import { GameTile } from '../components/GameTile'
-import { useApp } from '../store'
 import { OfferTable } from '../components/OfferTable'
 import { PriceChart } from '../components/PriceChart'
 import { Recommend } from '../components/Recommend'
-import { DEFAULT_KINDS, KIND_HINT, KIND_LABEL, rub } from '../util'
+import { useApp } from '../store'
+import { byPrice, DEFAULT_KINDS, KIND_HINT, KIND_LABEL, price } from '../util'
 
 export default function GamePage() {
   const { appid } = useParams()
@@ -15,7 +15,7 @@ export default function GamePage() {
   const [sel, setSel] = useState<Offer | null>(null)
   const [all, setAll] = useState(false)
   const [similar, setSimilar] = useState<CatalogItem[]>([])
-  const { addViewed } = useApp()
+  const { addViewed, toggleFav, isFav } = useApp()
 
   useEffect(() => {
     setCard(null)
@@ -30,57 +30,80 @@ export default function GamePage() {
   }, [appid])
 
   if (err) return <div className="error">{err}</div>
-  if (!card) return <div className="loading"><span className="spinner" /> Загружаем игру и цены во всех магазинах…</div>
+  if (!card) return <div className="loading"><span className="spinner" /> Собираю цены во всех магазинах, обычно до 10 секунд</div>
 
   const g = card.game
   const offers = all ? card.offers : card.offers.filter(o => DEFAULT_KINDS.includes(o.kind))
   const bestKinds = ['ключ', 'гифт', 'магазин', 'аккаунт'].filter(k => card.best[k])
+  const top = DEFAULT_KINDS.map(k => card.best[k]).filter(Boolean).sort(byPrice)[0]
+  const official = card.best['магазин']
+  const stores = new Set(card.offers.map(o => (o.store === 'plati.market' ? `plati:${o.seller}` : o.store))).size
 
   return (
     <>
-      <div className="game-head card">
-        {g.image && <img src={g.image} alt="" />}
-        <div>
-          <h1>{g.name}</h1>
-          <p className="muted">{g.genres.join(', ')}{g.release ? ` · выход: ${g.release}` : ''}</p>
-          <div className="stats">
-            {g.metacritic != null && <span className="stat"><b>{g.metacritic}</b> Metacritic</span>}
-            {g.steam_review_pct != null && <span className="stat"><b>{g.steam_review_pct}%</b> положительных из {g.steam_reviews?.toLocaleString('ru-RU')} отзывов Steam</span>}
-            <span className="stat"><b>{card.offers.length}</b> предложений</span>
+      <p className="product-meta" style={{ marginBottom: 12 }}>
+        <Link to="/">Главная</Link> / <Link to="/catalog">Каталог</Link> / {g.name}
+      </p>
+      <section className="product">
+        <div className="product-media">{g.image && <img src={g.image} alt={g.name} />}</div>
+        <div className="product-info">
+          <div>
+            <div className="product-meta">{g.genres.join(', ')}{g.release ? ` / выход ${g.release}` : ''}</div>
+            <h1>{g.name}</h1>
+            <div className="stats" style={{ marginTop: 8 }}>
+              {g.metacritic != null && <span className="stat">Metacritic <b>{g.metacritic}</b></span>}
+              {g.steam_review_pct != null && <span className="stat">Steam <b>{g.steam_review_pct}%</b> положительных</span>}
+              <span className="stat"><b>{card.offers.length}</b> предложений</span>
+            </div>
           </div>
+          {top && (
+            <div className="product-price">
+              <div className="big-price">{price(top)}</div>
+              <div className="product-meta" style={{ marginTop: 8 }}>
+                лучшая цена из {stores} продавцов и магазинов / {KIND_LABEL[top.kind].toLowerCase()} / {top.kind === 'магазин' ? top.store : top.seller}
+                {official && official.id !== top.id ? ` / официально ${price(official)}` : ''}
+              </div>
+            </div>
+          )}
+          {top && (
+            <div className="product-buy">
+              <a className="btn primary" href={top.url} target="_blank" rel="noopener noreferrer">В магазин ↗</a>
+              <button className="btn" onClick={() => toggleFav(top, g.appid)}>{isFav(top.id) ? 'Отслеживаю цену' : 'Следить за ценой'}</button>
+            </div>
+          )}
         </div>
-      </div>
+      </section>
 
-      <h2>Лучшая цена по типам</h2>
+      <div className="sec-head"><h2>Лучшая цена по типам</h2></div>
       <div className="best-grid">
         {bestKinds.map(k => {
           const o = card.best[k]
           return (
-            <button key={k} className={`best card ${sel?.id === o.id ? 'sel' : ''}`} onClick={() => setSel(o)} title={KIND_HINT[k]}>
+            <button key={k} className={`best ${sel?.id === o.id ? 'sel' : ''}`} onClick={() => setSel(o)} title={KIND_HINT[k]}>
               <span className={`kind k-${k}`}>{KIND_LABEL[k]}</span>
-              <span className="big-price">{rub(o.price)}</span>
-              <span className="muted small ellipsis">{o.kind === 'магазин' ? o.store : o.seller} · {o.platform}</span>
+              <span className="big-price">{price(o)}</span>
+              <span className="muted small ellipsis">{o.kind === 'магазин' ? o.store : o.seller} / {o.platform}</span>
             </button>
           )
         })}
-        {!bestKinds.length && <p className="muted">Надёжных предложений сейчас нет.</p>}
+        {!bestKinds.length && <p className="muted" style={{ padding: 16, background: 'var(--bg)' }}>Надёжных предложений сейчас нет.</p>}
       </div>
 
       <Recommend offers={card.offers} where="game" query={g.name} />
 
-      {sel && <div className="card"><PriceChart offerId={sel.id} title={`${KIND_LABEL[sel.kind]} · ${sel.kind === 'магазин' ? sel.store : sel.seller}`} /></div>}
+      {sel && <div className="card"><PriceChart offerId={sel.id} currency={sel.currency} title={`${KIND_LABEL[sel.kind]}, ${sel.kind === 'магазин' ? sel.store : sel.seller}`} /></div>}
 
       <div className="sec-head">
         <h2>Все предложения</h2>
         <label className="check inline"><input type="checkbox" checked={all} onChange={e => setAll(e.target.checked)} /> Показать аккаунты и прочее</label>
       </div>
-      <p className="muted small">Нажмите на строку — график цены покажет историю этого предложения.</p>
+      <p className="muted small" style={{ marginTop: -8 }}>Нажмите на строку, чтобы увидеть историю цены этого предложения.</p>
       <OfferTable offers={offers} appid={g.appid} onSelect={setSel} selected={sel?.id} />
       {similar.length > 0 && (
-        <section>
-          <h2>Похожие игры</h2>
+        <>
+          <div className="sec-head"><h2>Похожие игры</h2></div>
           <div className="tiles">{similar.map(s => <GameTile key={s.appid} g={s} />)}</div>
-        </section>
+        </>
       )}
     </>
   )

@@ -215,10 +215,11 @@ class Database:
         return [r[0] for r in self.db.execute("SELECT title FROM product")]
 
     def best_offer(self, appid: int) -> src.Offer | None:
-        """Самое дешёвое надёжное предложение игры (ключ, гифт или официальный магазин)."""
+        """Самое дешёвое надёжное предложение игры в рублях (ключ или гифт), иначе — официальный магазин."""
         kinds = ",".join(f"'{k}'" for k in GOOD_KINDS)
         r = self.db.execute(self._OFFER_SQL + f" JOIN product p ON p.id = o.product_id WHERE p.steam_appid=? "
-                            f"AND o.trusted=1 AND o.kind IN ({kinds}) ORDER BY o.price LIMIT 1", (appid,)).fetchone()
+                            f"AND o.trusted=1 AND o.kind IN ({kinds}) ORDER BY o.currency != 'RUB', o.price LIMIT 1",
+                            (appid,)).fetchone()
         return self._offer(r) if r else None
 
     def product_by_appid(self, appid: int) -> sqlite3.Row | None:
@@ -228,8 +229,10 @@ class Database:
         kinds = ",".join(f"'{k}'" for k in GOOD_KINDS)
         rows = self.db.execute(f"""
             SELECT p.*, COUNT(o.id) AS n,
-              MIN(CASE WHEN o.trusted=1 AND o.kind IN ({kinds}) THEN o.price END) AS best,
-              MIN(CASE WHEN o.kind='магазин' THEN o.price END) AS official
+              MIN(CASE WHEN o.trusted=1 AND o.kind IN ({kinds}) AND o.currency='RUB' THEN o.price END) AS best,
+              MIN(CASE WHEN o.kind='магазин' THEN o.price END) AS official,
+              MAX(CASE WHEN o.kind='магазин' AND o.old_price > o.price
+                       THEN ROUND(100.0 * (1 - o.price / o.old_price)) END) AS discount
             FROM product p LEFT JOIN offer o ON o.product_id = p.id
             GROUP BY p.id HAVING n > 0 ORDER BY n DESC, p.title LIMIT ?""", (limit,)).fetchall()
         out = []
@@ -237,10 +240,9 @@ class Database:
             best_kind = None
             if r["best"] is not None:
                 k = self.db.execute(f"SELECT kind FROM offer WHERE product_id=? AND trusted=1 AND kind IN ({kinds}) "
-                                    "ORDER BY price LIMIT 1", (r["id"],)).fetchone()
+                                    "AND currency='RUB' ORDER BY price LIMIT 1", (r["id"],)).fetchone()
                 best_kind = k[0] if k else None
-            savings = (round(100 * (1 - r["best"] / r["official"]))
-                       if r["best"] and r["official"] and r["best"] < r["official"] else None)
+            savings = int(r["discount"]) if r["discount"] else None  # скидка в официальном магазине, %
             out.append(dict(appid=r["steam_appid"], name=r["title"], image=r["image"], genres=json.loads(r["genres"]),
                             metacritic=r["metacritic"], steam_review_pct=r["steam_review_pct"], best_price=r["best"],
                             best_kind=best_kind, official_price=r["official"], offers=r["n"], savings_pct=savings,
@@ -248,7 +250,7 @@ class Database:
         return out
 
     def deals(self, limit: int = 12) -> list[dict]:
-        """«Выгодно сегодня»: игры, где лучшая цена заметно ниже официальной."""
+        """«Выгодно сегодня»: игры со скидкой в официальных магазинах (по данным CheapShark)."""
         items = [c for c in self.catalog(500) if c["savings_pct"]]
         return sorted(items, key=lambda c: -c["savings_pct"])[:limit]
 

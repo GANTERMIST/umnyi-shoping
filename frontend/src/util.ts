@@ -3,13 +3,20 @@ import type { Favorite, Kind, Offer, Profile } from './api'
 export const rub = (x: number | null | undefined) =>
   x == null ? '—' : `${Math.round(x).toLocaleString('ru-RU')} ₽`
 
+/** Сумма в своей валюте: рубли у продавцов, доллары у официальных магазинов — без пересчёта. */
+export const money = (x: number | null | undefined, currency = 'RUB') =>
+  x == null ? '—' : currency === 'USD' ? `$${x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : rub(x)
+export const price = (o: { price: number; currency: string }) => money(o.price, o.currency)
+/** Сортировка по цене без смешивания валют: сначала рубли, потом доллары. */
+export const byPrice = (a: Offer, b: Offer) => Number(a.currency !== 'RUB') - Number(b.currency !== 'RUB') || a.price - b.price
+
 export const KIND_LABEL: Record<string, string> = {
   ключ: 'Ключ', гифт: 'Гифт', магазин: 'Офиц. магазин', аккаунт: 'Аккаунт', пополнение: 'Пополнение', другое: 'Другое',
 }
 export const KIND_HINT: Record<string, string> = {
   ключ: 'Код активации — игра навсегда ваша',
   гифт: 'Подарок от продавца в Steam — игра навсегда ваша',
-  магазин: 'Покупка напрямую в Steam/GOG/Humble…, цена из $ по курсу ЦБ',
+  магазин: 'Покупка напрямую в Steam/GOG/Humble…, цена в долларах, оплата зарубежной картой',
   аккаунт: 'Доступ к чужой учётной записи — игра не ваша, есть риски',
   пополнение: 'Внутриигровая валюта или пополнение кошелька',
   другое: 'Тип не распознан — читайте описание у продавца',
@@ -71,7 +78,7 @@ export function habits(favorites: Favorite[]): { platform: string | null; kind: 
 
 export function trustLabel(o: Offer): string {
   if (o.kind === 'магазин') return 'Официальный магазин'
-  return o.trusted ? `Надёжный · ${Math.round(o.trust_score * 100)}%` : `Мало отзывов · ${Math.round(o.trust_score * 100)}%`
+  return o.trusted ? `Надёжный, ${Math.round(o.trust_score * 100)}%` : `Мало отзывов, ${Math.round(o.trust_score * 100)}%`
 }
 
 export interface Recommendation {
@@ -90,8 +97,9 @@ export function recommend(offers: Offer[], profile: Profile, favorites: Favorite
   const base = offers.filter(o => o.trusted && kinds.includes(o.kind) && regionFit(o, p.region) !== 'no')
   const byPlatform = p.platform ? base.filter(o => o.platform === p.platform) : base
   const pool = byPlatform.length ? byPlatform : base
-  const inBudget = p.budget ? pool.filter(o => o.price <= p.budget!) : pool
-  const list = (inBudget.length ? inBudget : pool).slice().sort((a, b) => a.price - b.price)
+  // бюджет — в рублях: к ценам официальных магазинов в долларах его не применяем
+  const inBudget = p.budget ? pool.filter(o => o.currency === 'RUB' && o.price <= p.budget!) : pool
+  const list = (inBudget.length ? inBudget : pool).slice().sort(byPrice)
   const best = list[0]
   if (!best) return null
   const reasons: string[] = []
@@ -124,18 +132,19 @@ export function compareVerdict(list: Offer[], userRegion: string): string[] {
   if (list.length < 2) return []
   const ok = list.filter(o => regionFit(o, userRegion) !== 'no')
   const pool = ok.length ? ok : list
-  const byPrice = pool.slice().sort((a, b) => a.price - b.price)
-  const cheapest = byPrice[0]
+  const sorted = pool.slice().sort(byPrice)
+  const cheapest = sorted[0]
   const safest = pool.slice().sort((a, b) => b.trust_score - a.trust_score || a.price - b.price)[0]
-  const second = byPrice[1]
+  const second = sorted.find(o => o.id !== cheapest.id && o.currency === cheapest.currency)
   const name = (o: Offer) => (o.kind === 'магазин' ? o.store : `${KIND_LABEL[o.kind].toLowerCase()} у ${o.seller}`)
-  const out = [`Дешевле всего — ${name(cheapest)}: ${rub(cheapest.price)}` +
-    (second ? `, на ${rub(second.price - cheapest.price)} дешевле следующего варианта.` : '.')]
-  if (safest.id !== cheapest.id) out.push(`Надёжнее всего — ${name(safest)} (${trustLabel(safest)}), переплата ${rub(safest.price - cheapest.price)}.`)
+  const out = [`Дешевле всего — ${name(cheapest)}: ${price(cheapest)}` +
+    (second ? `, на ${money(second.price - cheapest.price, cheapest.currency)} дешевле следующего варианта.` : '.')]
+  if (safest.id !== cheapest.id) out.push(`Надёжнее всего — ${name(safest)} (${trustLabel(safest)}), ${price(safest)}` +
+    (safest.currency === cheapest.currency ? `, переплата ${money(safest.price - cheapest.price, safest.currency)}.` : ': цена в долларах, с рублями напрямую не сравнить.'))
   if (cheapest.kind === 'аккаунт') out.push('Самый дешёвый вариант — аккаунт: игра не станет вашей. Если нужна навсегда — берите ключ или гифт.')
   const bad = list.filter(o => regionFit(o, userRegion) === 'no')
   if (bad.length) out.push(`Не подходят по региону: ${bad.map(name).join(', ')}.`)
   const pick = cheapest.kind !== 'аккаунт' && cheapest.trusted ? cheapest : safest
-  out.push(`Наш выбор: ${name(pick)} за ${rub(pick.price)}.`)
+  out.push(`Наш выбор: ${name(pick)} за ${price(pick)}.`)
   return out
 }

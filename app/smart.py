@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 
-from .assistant import ANY, _rub, find
+from .assistant import ANY, _money, _rub, find
 from .nlu import model as nlu
 from .nlu.model import Frame
 from .schemas import AssistantIn, AssistantOut, CatalogItem, NluOut, OfferOut, Profile
@@ -42,9 +42,9 @@ FAQ = {
     "пополнение": "Пополнение — продавец зачисляет валюту (робуксы, V-Bucks, кристаллы) или деньги на кошелёк по вашему "
                   "логину/ID. Обычно занимает от пары минут до часа. Выбирайте продавцов с отметкой «Надёжный» и "
                   "никогда не отдавайте пароль, если хватает логина или ID.",
-    "магазин": "Официальный магазин — покупка напрямую в Steam, GOG, Humble, Fanatical и др. Цены мы берём через CheapShark "
-               "в долларах и пересчитываем по курсу ЦБ, поэтому они ориентировочные; оплатить там из России можно только "
-               "зарубежной картой. Зато это без посредников и без риска с регионом.",
+    "магазин": "Официальный магазин — покупка напрямую в Steam, GOG, Humble, Fanatical и др. Цены берём через CheapShark "
+               "и показываем как есть, в долларах: в рубли не пересчитываем, потому что итог зависит от способа оплаты. "
+               "Оплатить там из России можно только зарубежной картой. Зато это без посредников и без риска с регионом.",
     "region": "Регион — где можно активировать товар. RU и СНГ подходят для российского аккаунта, Global — для любого, "
               "«не для РФ», TR, EU, KZ — не для российского. Мы определяем регион по описанию продавца и сравниваем с регионом "
               "из вашего профиля: зелёный — подходит, красный — нет, жёлтый — продавец не указал, уточните перед покупкой.",
@@ -53,7 +53,7 @@ FAQ = {
               "10% отрицательных), число продаж и регион, не платите продавцу напрямую мимо площадки.",
     "trust": "Надёжность — это доля положительных отзывов продавца с поправкой на малое число отзывов: (плюсы+1)/(все+2). "
              "«Надёжный» — минимум 5 положительных и не больше 10% отрицательных. Официальные магазины всегда надёжны.",
-    "data": "Цены продавцов — из открытого API Plati.market, официальных магазинов — из CheapShark, сведения об играх и "
+    "data": "Цены продавцов — из открытого API Plati.market (в рублях), официальных магазинов — из CheapShark (в долларах), сведения об играх и "
             "отзывы — из Steam. Загрузчик обновляет базу по популярным играм, а при поиске цены берутся заново в реальном времени.",
     "features": "Нажмите ♥ у предложения — цена запомнится, и если она изменится, в меню «Избранное» появится значок, "
                 "а в списке будет видно, на сколько подешевело. Галочка «Сравнить» добавляет до 4 предложений в сравнение.",
@@ -127,7 +127,7 @@ async def _review(service: Service, f: Frame, profile: Profile | None) -> Assist
         parts.append("Многие недовольны — подумайте, прежде чем покупать.")
     if res.offers:
         o = res.offers[0]
-        parts.append(f"Купить сейчас можно от {_rub(o.price)} ({KIND_NAME[o.kind]}, {o.seller}).")
+        parts.append(f"Купить сейчас можно от {_money(o)} ({KIND_NAME[o.kind]}, {o.seller}).")
     return AssistantOut(answer=" ".join(parts), offers=res.offers[:3], game=g, engine="model")
 
 
@@ -141,20 +141,18 @@ async def _compare(service: Service, f: Frame, profile: Profile | None) -> Assis
                             offers=[], game=res.game, engine="model")
     parts = []
     if sellers:
-        s = sellers[0]
-        parts.append(f"У продавцов {name} от {_rub(s.price)} ({s.kind}, {s.platform}, {s.seller}).")
+        x = sellers[0]
+        parts.append(f"У продавцов {name} от {_money(x)} ({x.kind}, {x.platform}, {x.seller}).")
+    else:
+        parts.append(f"Ключей и гифтов {name} у надёжных продавцов сейчас нет.")
     if official:
         o = official[0]
-        parts.append(f"В официальных магазинах — от {_rub(o.price)} ({o.store}; всего магазинов: {len(official)}).")
+        sale = f", скидка {round(100 * (1 - o.price / o.old_price))}%" if o.old_price else ""
+        parts.append(f"В официальных магазинах — от {_money(o)} ({o.store}{sale}; всего магазинов: {len(official)}).")
+        parts.append("Официальные цены — в долларах, их оплачивают зарубежной картой; у продавцов — в рублях, "
+                     "но важно, чтобы регион ключа или гифта подходил к вашему аккаунту.")
     else:
         parts.append("Официальных цен нет: CheapShark не знает эту игру или она бесплатная.")
-    if sellers and official:
-        diff = official[0].price - sellers[0].price
-        if diff > 0:
-            parts.append(f"У продавцов дешевле на {_rub(diff)} ({round(100 * diff / official[0].price)}%).")
-        else:
-            parts.append(f"Официально даже дешевле на {_rub(-diff)} — берите в магазине.")
-        parts.append("Помните: у продавцов важен регион ключа или гифта, а официальная цена в $ — платить нужно зарубежной картой.")
     picks = sellers[:2] + official[:1]
     return AssistantOut(answer=" ".join(parts), offers=picks, game=res.game, engine="model")
 
@@ -199,7 +197,7 @@ async def _recommend(service: Service, f: Frame, profile: Profile | None) -> Ass
             pool = sorted(pool, key=lambda i: i.best_price)
     if not (f.genre or like or budget):  # «что сейчас выгодно» — по скидке к официальной цене
         pool = sorted(pool, key=lambda i: (-(i.savings_pct or 0), -(i.steam_review_pct or 0)))
-        conds.append("самые большие скидки к официальной цене")
+        conds.append("самые большие скидки в официальных магазинах")
     elif not like:
         pool = sorted(pool, key=lambda i: (-(i.steam_review_pct or 60) - 0.3 * (i.savings_pct or 0)))
     top = pool[:3]
@@ -211,7 +209,7 @@ async def _recommend(service: Service, f: Frame, profile: Profile | None) -> Ass
         if i.steam_review_pct is not None:
             bits.append(f"{i.steam_review_pct}% положительных отзывов")
         if i.savings_pct:
-            bits.append(f"на {i.savings_pct}% дешевле официальной цены")
+            bits.append(f"скидка {i.savings_pct}% в официальном магазине")
         lines.append(f"{n}. {i.name} — {', '.join(bits)}.")
         o = service.db.best_offer(i.appid)
         if o:

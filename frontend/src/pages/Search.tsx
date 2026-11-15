@@ -41,7 +41,7 @@ export default function Search() {
     kinds.includes(o.kind) &&
     (!platforms.length || platforms.includes(o.platform)) &&
     (stores === 'all' || (stores === 'plati') === (o.store === 'plati.market')) &&
-    (!maxPrice || o.price <= Number(maxPrice)) &&
+    (!maxPrice || (o.currency === 'RUB' && o.price <= Number(maxPrice))) &&  // бюджет в рублях
     (!trusted || o.trusted) &&
     (!regionOk || regionFit(o, profile.region) !== 'no')), [res, kinds, platforms, stores, maxPrice, trusted, regionOk, profile.region])
 
@@ -89,9 +89,9 @@ export default function Search() {
                 {res.game.image && <img src={res.game.image} alt="" />}
                 <div>
                   <h1>{res.game.name}</h1>
-                  <p className="muted">{res.game.genres.join(', ')}{res.game.metacritic ? ` · Metacritic ${res.game.metacritic}` : ''}
-                    {res.game.steam_review_pct != null ? ` · ${res.game.steam_review_pct}% положительных отзывов Steam` : ''}</p>
-                  <Link to={`/game/${res.game.appid}`} className="btn small">Карточка игры и график цены →</Link>
+                  <p className="muted">{res.game.genres.join(', ')}{res.game.metacritic ? ` / Metacritic ${res.game.metacritic}` : ''}
+                    {res.game.steam_review_pct != null ? ` / ${res.game.steam_review_pct}% положительных отзывов Steam` : ''}</p>
+                  <Link to={`/game/${res.game.appid}`} className="btn small">Карточка игры и история цены</Link>
                 </div>
               </div>
             ) : <h1>Результаты по «{q}»</h1>}

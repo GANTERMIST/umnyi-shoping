@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Offer } from '../api'
 import { useApp } from '../store'
-import { compareVerdict, delivery, guarantee, KIND_LABEL, regionText, rub, trustLabel } from '../util'
+import { compareVerdict, delivery, guarantee, KIND_LABEL, price, regionText, trustLabel } from '../util'
 import { Feedback } from '../components/Feedback'
 
 export default function Compare() {
@@ -15,10 +15,13 @@ export default function Compare() {
       </div>
     )
   }
-  const minPrice = Math.min(...compare.map(o => o.price))
+  // «лучше» по цене — только среди цен одной валюты (рубли с долларами не сравниваем)
+  const rubPrices = compare.filter(o => o.currency === 'RUB').map(o => o.price)
+  const minCur = rubPrices.length ? 'RUB' : 'USD'
+  const minPrice = Math.min(...compare.filter(o => o.currency === minCur).map(o => o.price))
   const maxTrust = Math.max(...compare.map(o => o.trust_score))
   const rows: { label: string; get: (o: Offer) => React.ReactNode; best?: (o: Offer) => boolean }[] = [
-    { label: 'Цена', get: o => <b>{rub(o.price)}</b>, best: o => o.price === minPrice },
+    { label: 'Цена', get: o => <b>{price(o)}</b>, best: o => o.currency === minCur && o.price === minPrice },
     { label: 'Тип', get: o => KIND_LABEL[o.kind] },
     { label: 'Платформа', get: o => o.platform },
     { label: 'Магазин', get: o => o.store },
@@ -38,7 +41,7 @@ export default function Compare() {
       </div>
       {compare.length > 1 && (
         <div className="recommend card">
-          <span className="rec-label">★ Вывод</span>
+          <span className="rec-label">Вывод</span>
           <ul className="verdict">{compareVerdict(compare, profile.region).map(t => <li key={t}>{t}</li>)}</ul>
           <Feedback where="compare" query={compare.map(o => o.id).sort().join(',')} />
         </div>
@@ -59,13 +62,13 @@ export default function Compare() {
           <tbody>
             {rows.map(r => (
               <tr key={r.label}>
-                <th>{r.label}</th>
+                <th scope="row">{r.label}</th>
                 {compare.map(o => <td key={o.id} className={r.best?.(o) ? 'best-cell' : ''}>{r.get(o)}</td>)}
               </tr>
             ))}
             <tr>
               <th />
-              {compare.map(o => <td key={o.id}><a className="btn primary small" href={o.url} target="_blank" rel="noopener noreferrer">Купить →</a></td>)}
+              {compare.map(o => <td key={o.id}><a className="btn primary small" href={o.url} target="_blank" rel="noopener noreferrer">Купить ↗</a></td>)}
             </tr>
           </tbody>
         </table>

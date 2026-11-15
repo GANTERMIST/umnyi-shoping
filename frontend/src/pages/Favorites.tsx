@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../store'
-import { rub } from '../util'
+import { money } from '../util'
 
 export default function Favorites() {
   const { favorites, prices, removeFav, refreshPrices, user, changed, reached, setTarget } = useApp()
@@ -11,7 +11,7 @@ export default function Favorites() {
     return (
       <div className="empty">
         <h2>В избранном пусто</h2>
-        <p className="muted">Нажмите ♥ у предложения — сервис запомнит цену и покажет, когда она изменится.</p>
+        <p className="muted">Нажмите на сердце у предложения: сервис запомнит цену и покажет, когда она изменится.</p>
         <Link to="/catalog" className="btn">В каталог</Link>
       </div>
     )
@@ -24,9 +24,9 @@ export default function Favorites() {
           {busy ? 'Проверяем…' : 'Проверить цены'}
         </button>
       </div>
-      {reached > 0 && <div className="notice hot">🎯 Целевая цена достигнута у {reached} {reached === 1 ? 'товара' : 'товаров'} — пора покупать!</div>}
+      {reached > 0 && <div className="notice hot">Целевая цена достигнута у {reached} {reached === 1 ? 'товара' : 'товаров'}. Можно покупать.</div>}
       {changed > 0
-        ? <div className="notice hot">🔔 Цена изменилась у {changed} {changed === 1 ? 'товара' : 'товаров'} с момента добавления</div>
+        ? <div className="notice hot">Цена изменилась у {changed} {changed === 1 ? 'товара' : 'товаров'} с момента добавления</div>
         : <p className="muted small">Цены обновляются загрузчиком и при каждом поиске. Изменения подсвечиваются здесь и значком в меню.</p>}
       {!user && <p className="muted small"><Link to="/login">Войдите</Link>, чтобы избранное сохранялось на всех устройствах.</p>}
       <div className="table-wrap">
@@ -43,18 +43,18 @@ export default function Favorites() {
                     {f.appid ? <Link to={`/game/${f.appid}`}>{f.title}</Link> : f.title}
                     <div className="muted small">добавлено {new Date(f.added_at).toLocaleDateString('ru-RU')}</div>
                   </td>
-                  <td className="num">{rub(f.price)}</td>
-                  <td className="num price">{now != null ? rub(now) : <span className="muted small">нет данных</span>}</td>
+                  <td className="num">{money(f.price, f.currency)}</td>
+                  <td className="num price">{now != null ? money(now, f.currency) : <span className="muted small">нет данных</span>}</td>
                   <td className="num">
-                    {diff < 0 && <span className="down">▼ {rub(-diff)} ({Math.round((-diff / f.price) * 100)}%)</span>}
-                    {diff > 0 && <span className="up">▲ {rub(diff)}</span>}
+                    {diff < 0 && <span className="down">▼ {money(-diff, f.currency)} ({Math.round((-diff / f.price) * 100)}%)</span>}
+                    {diff > 0 && <span className="up">▲ {money(diff, f.currency)}</span>}
                     {!diff && <span className="muted">—</span>}
                   </td>
                   <td className="num">
                     <input className="target" type="number" min={1} defaultValue={f.target_price ?? ''} placeholder="₽"
                       aria-label="Целевая цена" title="Уведомим, когда цена станет не выше"
                       onBlur={e => setTarget(f.offer_id, e.target.value ? Number(e.target.value) : null)} />
-                    {hit && <div className="ok small">🎯 достигнута</div>}
+                    {hit && <div className="ok small">достигнута</div>}
                   </td>
                   <td className="actions"><button className="btn small ghost" onClick={() => removeFav(f.offer_id)}>Убрать</button></td>
                 </tr>

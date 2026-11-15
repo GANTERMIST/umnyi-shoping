@@ -7,15 +7,12 @@ from __future__ import annotations
 
 import asyncio
 import re
-import time
 from dataclasses import dataclass, field
 
 import httpx
 
 UA = "SmartShopping-UrFU/1.0 (student project)"
 CHEAPSHARK = "https://www.cheapshark.com/api/1.0"
-CBR_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
-FALLBACK_USD_RATE = 85.0
 STEAM_CC = "kz"  # для cc=ru Steam отдаёт success:false; цены в KZT нам не нужны, берём метаданные
 TIMEOUT = httpx.Timeout(20.0, connect=10.0)
 
@@ -171,7 +168,6 @@ class Sources:
     def __init__(self, client: httpx.AsyncClient | None = None):
         self.http = client or httpx.AsyncClient(headers={"User-Agent": UA, "Accept": "application/json"},
                                                 timeout=TIMEOUT, follow_redirects=True)
-        self._usd: tuple[float, float] | None = None  # (время, курс)
         self._stores: dict[str, str] = {}
 
     async def aclose(self):
@@ -249,19 +245,7 @@ class Sources:
                 break
         return out
 
-    # Официальные магазины через CheapShark (Steam, GOG, Humble, Fanatical, GMG…), цены в $
-    async def usd_rate(self) -> tuple[float, bool]:
-        """Курс доллара ЦБ РФ (кэш 6 ч). (курс, получен ли он сейчас от ЦБ)."""
-        if self._usd and time.monotonic() - self._usd[0] < 6 * 3600:
-            return self._usd[1], True
-        try:
-            data = await self._json(CBR_URL, {}, tries=1)
-            rate = float(data["Valute"]["USD"]["Value"])
-        except (SourceError, KeyError, TypeError, ValueError):
-            return FALLBACK_USD_RATE, False
-        self._usd = (time.monotonic(), rate)
-        return rate, True
-
+    # Официальные магазины через CheapShark (Steam, GOG, Humble, Fanatical, GMG…): цены в долларах, как в самом магазине
     async def cheapshark_stores(self) -> dict[str, str]:
         if not self._stores:
             try:
@@ -280,8 +264,6 @@ class Sources:
         if not isinstance(deals, list) or not deals:
             return [], []
         stores = await self.cheapshark_stores()
-        rate, fresh = await self.usd_rate()
-        warnings = [] if fresh else [f"Курс ЦБ недоступен — цены в $ пересчитаны по {FALLBACK_USD_RATE} ₽"]
         best: dict[str, dict] = {}
         for d in deals:
             try:
@@ -297,13 +279,13 @@ class Sources:
             usd, usd_old = float(d["salePrice"]), float(d.get("normalPrice") or d["salePrice"])
             out.append(Offer(
                 id=f"{norm(name).replace(' ', '-')}:{game.appid}", store=name, title=f"{d.get('title') or game.name} — {name}",
-                price=round(usd * rate), currency="RUB", url=f"https://www.cheapshark.com/redirect?dealID={d['dealID']}",
+                price=usd, currency="USD", url=f"https://www.cheapshark.com/redirect?dealID={d['dealID']}",
                 seller=name, seller_rating=0, sold=0, reviews_pos=0, reviews_neg=0, returns=0,
                 kind="магазин", platform=plat, trusted=True, trust_score=1.0, image=d.get("thumb"), region="GLOBAL",
-                old_price=round(usd_old * rate) if usd_old > usd else None,
-                note=f"Официальный магазин: ${usd:.2f} по курсу ЦБ {rate:.2f} ₽, оплата зарубежной картой",
+                old_price=usd_old if usd_old > usd else None,
+                note="Официальный магазин: цена в долларах, оплата зарубежной картой",
             ))
-        return sorted(out, key=lambda o: o.price), warnings
+        return sorted(out, key=lambda o: o.price), []
 
     async def top_games(self, n: int = 50) -> list[int]:
         """appid самых популярных игр Steam (в топе много бесплатных — их отсеет загрузчик)."""

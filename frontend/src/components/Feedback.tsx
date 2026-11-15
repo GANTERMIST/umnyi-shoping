@@ -13,12 +13,12 @@ export function Feedback({ where, offerId, query }: { where: 'search' | 'game' |
     setVoted(v)
     try { localStorage.setItem(key, v) } catch { /* приватный режим */ }
   }
-  if (voted) return <div className="feedback muted small">Спасибо за ответ{voted === 'yes' ? ' 🙂' : ' — учтём'}!</div>
+  if (voted) return <div className="feedback muted small">{voted === 'yes' ? 'Спасибо, ответ записан.' : 'Спасибо, учтём при подборе.'}</div>
   return (
     <div className="feedback small">
       <span className="muted">Рекомендация помогла выбрать?</span>
-      <button className="btn small ghost" onClick={() => vote(true)}>👍 Да</button>
-      <button className="btn small ghost" onClick={() => vote(false)}>👎 Нет</button>
+      <button className="btn small ghost" onClick={() => vote(true)}>Да</button>
+      <button className="btn small ghost" onClick={() => vote(false)}>Нет</button>
     </div>
   )
 }

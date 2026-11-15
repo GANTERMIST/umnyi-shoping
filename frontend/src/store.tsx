@@ -56,7 +56,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [compare, setCompare] = useState<Offer[]>(() => load('us.compare', []))
   const [prices, setPrices] = useState<Record<string, number>>({})
   const [viewed, setViewed] = useState<Viewed[]>(() => load('us.viewed', []))
-  const [theme, setThemeState] = useState<'light' | 'dark'>(() => load('us.theme', 'light'))
+  const [theme, setThemeState] = useState<'light' | 'dark'>(() => load('us.theme', 'dark'))
 
   useEffect(() => { save('us.profile', profile) }, [profile])
   useEffect(() => { save('us.favorites', favorites) }, [favorites])
@@ -117,7 +117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isFav: id => favorites.some(f => f.offer_id === id),
     toggleFav: (o, appid = null) => {
       if (favorites.some(f => f.offer_id === o.id)) pushFavorites(favorites.filter(f => f.offer_id !== o.id))
-      else pushFavorites([...favorites, { offer_id: o.id, title: o.title, price: o.price, appid, added_at: new Date().toISOString(),
+      else pushFavorites([...favorites, { offer_id: o.id, title: o.title, price: o.price, currency: o.currency, appid, added_at: new Date().toISOString(),
         kind: o.kind, platform: o.platform }])
     },
     removeFav: id => pushFavorites(favorites.filter(f => f.offer_id !== id)),

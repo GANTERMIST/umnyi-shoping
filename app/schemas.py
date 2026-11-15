@@ -14,7 +14,7 @@ class OfferOut(BaseModel):
     store: str = Field(examples=["plati.market"])
     title: str = Field(description="Название как у продавца")
     price: float = Field(examples=[1290.0])
-    currency: str = Field(examples=["RUB"])
+    currency: str = Field(examples=["RUB", "USD"], description="RUB у продавцов, USD у официальных магазинов — без пересчёта")
     url: str = Field(description="Ссылка на покупку")
     seller: str
     seller_rating: float
@@ -28,8 +28,8 @@ class OfferOut(BaseModel):
     trust_score: float = Field(ge=0, le=1, description="Сглаженная доля положительных отзывов — для сортировки и шкалы надёжности")
     image: str | None = None
     region: str | None = Field(None, description="Регион активации из названия: RU, CIS, GLOBAL, KZ, TR, EU, NO_RU; null — не указан")
-    old_price: float | None = Field(None, description="Цена без скидки (официальные магазины)")
-    note: str | None = Field(None, description="Пояснение: например, что цена пересчитана из $")
+    old_price: float | None = Field(None, description="Цена без скидки в той же валюте (официальные магазины)")
+    note: str | None = Field(None, description="Пояснение: например, что цена в долларах и нужна зарубежная карта")
 
 
 class GameOut(BaseModel):
@@ -102,11 +102,11 @@ class CatalogItem(BaseModel):
     genres: list[str]
     metacritic: int | None
     steam_review_pct: int | None
-    best_price: float | None = Field(description="Лучшая цена у надёжных: ключ, гифт или магазин")
+    best_price: float | None = Field(description="Лучшая цена у надёжных продавцов в рублях (ключ или гифт)")
     best_kind: str | None
-    official_price: float | None = Field(description="Минимальная цена в официальных магазинах")
+    official_price: float | None = Field(description="Минимальная цена в официальных магазинах, в долларах")
     offers: int
-    savings_pct: int | None = Field(None, description="На сколько % лучшая цена ниже официальной")
+    savings_pct: int | None = Field(None, description="Скидка в официальном магазине, % (по данным CheapShark)")
     updated_at: str | None
 
 
@@ -141,6 +141,7 @@ class FavoriteItem(BaseModel):
     kind: str | None = Field(None, description="Тип товара — для подбора по истории предпочтений")
     platform: str | None = None
     target_price: float | None = Field(None, gt=0, description="Целевая цена: уведомить, когда цена станет не выше")
+    currency: str = Field("RUB", description="Валюта цены предложения")
 
 
 class MeOut(BaseModel):

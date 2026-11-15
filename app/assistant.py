@@ -56,6 +56,11 @@ def _rub(x: float) -> str:
     return f"{x:,.0f}".replace(",", " ") + " ₽"
 
 
+def _money(o: OfferOut) -> str:
+    """Цена в валюте предложения: рубли у продавцов, доллары у официальных магазинов (без пересчёта)."""
+    return f"${o.price:,.2f}".replace(",", " ") if o.currency == "USD" else _rub(o.price)
+
+
 def _offers_word(n: int) -> str:
     if n % 10 == 1 and n % 100 != 11:
         return f"{n} предложение"
@@ -73,11 +78,11 @@ def _rules_answer(p: dict, res: SearchOut, picks: list[OfferOut]) -> str:
         return (f"Нашёл {_offers_word(res.matched)} по «{what}», но ни одно не подходит под условия"
                 f"{' — до ' + _rub(p['max_price']) if p['max_price'] else ''}. Попробуйте ослабить фильтры.")
     best = picks[0]
-    who = (f"официальный магазин {best.store} (цена пересчитана из $ по курсу ЦБ)" if best.kind == "магазин"
+    who = (f"официальный магазин {best.store} (цена в долларах, оплата зарубежной картой)" if best.kind == "магазин"
            else f"{best.kind}, {best.platform}, продавец {best.seller} (+{best.reviews_pos} / −{best.reviews_neg})")
-    lines = [f"По «{what}» нашёл {_offers_word(res.matched)}. Самое выгодное из надёжных — {_rub(best.price)}: {who}."]
+    lines = [f"По «{what}» нашёл {_offers_word(res.matched)}. Самое выгодное из надёжных — {_money(best)}: {who}."]
     if len(picks) > 1:
-        lines.append("Ещё варианты: " + "; ".join(f"{_rub(o.price)} — {o.seller}" for o in picks[1:3]) + ".")
+        lines.append("Ещё варианты: " + "; ".join(f"{_money(o)} — {o.seller}" for o in picks[1:3]) + ".")
     if best.kind == "аккаунт":
         lines.append("Учтите: аккаунт — это общий доступ, игра не будет вашей навсегда. Ключ или гифт надёжнее.")
     if res.game and res.game.metacritic:
@@ -130,7 +135,7 @@ async def find(service: Service, p: dict, default_kinds: list[str], engine: str)
 
 # ── Claude ──────────────────────────────────────────────────────
 
-SYSTEM = """Ты — ассистент сервиса «Умный Шопинг», агрегатора цен на игры и игровые товары (ключи, гифты, аккаунты, пополнения) у продавцов Plati.market и в официальных магазинах (Steam, GOG, Humble, Fanatical и др.; их цены в $ пересчитаны в рубли, оплата зарубежной картой).
+SYSTEM = """Ты — ассистент сервиса «Умный Шопинг», агрегатора цен на игры и игровые товары (ключи, гифты, аккаунты, пополнения) у продавцов Plati.market и в официальных магазинах (Steam, GOG, Humble, Fanatical и др.; их цены в долларах, оплата зарубежной картой).
 Если в сообщении есть [Профиль пользователя] — используй его бюджет, платформу и типы, когда в вопросе они не указаны.
 
 Как работать:
@@ -152,7 +157,7 @@ TOOL = {
             "query": {"type": "string", "description": "Название игры или товара, например «Elden Ring» или «robux»"},
             "kind": {"type": "string", "enum": ["ключ_или_гифт", "ключ", "гифт", "магазин", "аккаунт", "пополнение", "любой"],
                      "description": "Тип товара; ключ_или_гифт — по умолчанию для игр (включает и официальные магазины); "
-                                    "магазин — только официальные магазины (Steam, GOG, Humble…), цена пересчитана из $"},
+                                    "магазин — только официальные магазины (Steam, GOG, Humble…), цена в долларах"},
             "platform": {"type": "string", "enum": ["любая", "Steam", "Xbox", "PlayStation", "Nintendo", "GOG", "Epic"]},
             "max_price": {"type": "number", "description": "Бюджет в рублях; 0 — без ограничения"},
         },
@@ -185,7 +190,7 @@ def _client() -> anthropic.AsyncAnthropic:
 
 
 def _compact(o: OfferOut) -> dict:
-    return {"id": o.id, "price_rub": o.price, "kind": o.kind, "platform": o.platform, "seller": o.seller,
+    return {"id": o.id, "price": o.price, "currency": o.currency, "kind": o.kind, "platform": o.platform, "seller": o.seller,
             "reviews": f"+{o.reviews_pos}/-{o.reviews_neg}", "sold": o.sold, "title": o.title[:90]}
 
 

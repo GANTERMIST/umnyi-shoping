@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, type CatalogItem } from '../api'
 import { GameTile, Skeletons } from '../components/GameTile'
 import { useApp } from '../store'
-import { rub } from '../util'
+import { money, price } from '../util'
 
 const CHIPS = [
   'Ключ Elden Ring для Steam до 2000',
@@ -47,7 +47,7 @@ export default function Home() {
       {err && <p className="error">{err}</p>}
 
       <section>
-        <div className="sec-head"><h2>Выгодно сегодня</h2><Link to="/catalog?sort=savings">Все →</Link></div>
+        <div className="sec-head"><h2>Выгодно сегодня</h2><Link to="/catalog?sort=savings">Все скидки</Link></div>
         {!deals ? <Skeletons /> : deals.length ? (
           <div className="tiles">{deals.map(g => <GameTile key={g.appid} g={g} />)}</div>
         ) : <p className="muted">Скидок пока нет. Загрузите цены: <code>python -m app.loader</code> или поищите игру.</p>}
@@ -55,7 +55,7 @@ export default function Home() {
 
       <div className="two-col">
         <section className="card">
-          <div className="sec-head"><h2>Отслеживаю</h2><Link to="/favorites">Избранное →</Link></div>
+          <div className="sec-head"><h2>Отслеживаю</h2><Link to="/favorites">Всё избранное</Link></div>
           {favorites.length ? (
             <ul className="watch">
               {favorites.slice(0, 5).map(f => {
@@ -64,18 +64,18 @@ export default function Home() {
                 return (
                   <li key={f.offer_id}>
                     <span className="ellipsis">{f.title}</span>
-                    <b>{rub(now ?? f.price)}</b>
-                    {diff !== 0 && <span className={diff < 0 ? 'down' : 'up'}>{diff < 0 ? '▼' : '▲'} {rub(Math.abs(diff))}</span>}
+                    <b>{money(now ?? f.price, f.currency)}</b>
+                    {diff !== 0 && <span className={diff < 0 ? 'down' : 'up'}>{diff < 0 ? '▼' : '▲'} {money(Math.abs(diff), f.currency)}</span>}
                   </li>
                 )
               })}
             </ul>
-          ) : <p className="muted">Нажмите ♥ у предложения — покажем, когда изменится цена.</p>}
+          ) : <p className="muted">Нажмите на сердце у предложения, и здесь появится его цена.</p>}
         </section>
         <section className="card">
-          <div className="sec-head"><h2>Сравнение</h2><Link to="/compare">Открыть →</Link></div>
+          <div className="sec-head"><h2>Сравнение</h2><Link to="/compare">Открыть</Link></div>
           {compare.length ? (
-            <ul className="watch">{compare.map(o => <li key={o.id}><span className="ellipsis">{o.title}</span><b>{rub(o.price)}</b></li>)}</ul>
+            <ul className="watch">{compare.map(o => <li key={o.id}><span className="ellipsis">{o.title}</span><b>{price(o)}</b></li>)}</ul>
           ) : <p className="muted">Отметьте «Сравнить» у 2–4 предложений, чтобы увидеть их рядом.</p>}
         </section>
       </div>
@@ -95,7 +95,7 @@ export default function Home() {
       )}
 
       <section>
-        <div className="sec-head"><h2>Популярное сейчас</h2><Link to="/catalog">Каталог →</Link></div>
+        <div className="sec-head"><h2>Популярное сейчас</h2><Link to="/catalog">Весь каталог</Link></div>
         {!popular ? <Skeletons /> : popular.length ? (
           <div className="tiles">{popular.map(g => <GameTile key={g.appid} g={g} />)}</div>
         ) : <p className="muted">Каталог пуст — запустите загрузчик цен.</p>}

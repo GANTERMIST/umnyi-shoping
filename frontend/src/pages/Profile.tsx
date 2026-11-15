@@ -54,7 +54,7 @@ export default function ProfilePage() {
         </fieldset>
         <div className="row">
           <button className="btn primary">Сохранить</button>
-          {saved && <span className="ok">Сохранено ✓</span>}
+          {saved && <span className="ok">Сохранено</span>}
           {user && <button type="button" className="btn ghost" onClick={async () => { await signOut(); nav('/') }}>Выйти</button>}
         </div>
       </form>
