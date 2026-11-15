@@ -345,6 +345,8 @@ async def put_favorites(body: list[FavoriteItem], us_session: SessionCookie = No
 async def spa(path: str):
     if path.startswith("api/"):
         raise HTTPException(404, "Нет такого метода API")
+    if path.startswith("assets/") and not (DIST / path).is_file():
+        raise HTTPException(404, "Файла нет — обновите страницу")  # старая сборка; HTML вместо JS дал бы белый экран
     f = (DIST / path).resolve()
     if path and f.is_file() and DIST.resolve() in f.parents:
         return FileResponse(f)

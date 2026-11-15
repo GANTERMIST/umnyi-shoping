@@ -8,6 +8,16 @@
     <link rel="apple-touch-icon" href="/icon.svg" />
     <meta name="theme-color" content="#4f46e5" />
     <title>Умный Шопинг — цены на игры</title>
+    <script>
+      // После выкладки новой версии старый index.html из кеша ссылается на удалённые файлы — перезагружаемся один раз
+      addEventListener('error', function (e) {
+        var t = e.target
+        if (t && t.tagName === 'SCRIPT' && /\/assets\//.test(t.src || '') && !sessionStorage.getItem('us-reloaded')) {
+          sessionStorage.setItem('us-reloaded', '1'); location.reload()
+        }
+      }, true)
+      addEventListener('load', function () { setTimeout(function () { sessionStorage.removeItem('us-reloaded') }, 5000) })
+    </script>
   </head>
   <body>
     <div id="root"></div>
