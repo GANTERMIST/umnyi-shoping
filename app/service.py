@@ -64,6 +64,7 @@ class Service:
         self.history = self.db  # старое имя: history.db — соединение SQLite
         self.dlc_names: dict[int, list[str]] = {}
         self.dlc_limit = dlc_limit
+        self.plati_down_until = 0.0
 
     async def _resolve(self, query: str) -> tuple[src.Game | None, list[str]]:
         """Игра из Steam + названия «соседей» по серии, которые надо исключить."""
@@ -104,9 +105,13 @@ class Service:
         steam_task = asyncio.create_task(self._steam_and_official(query))
         plati_ok = True
         try:
+            if time.monotonic() < self.plati_down_until:  # только что не ответил — не ждём снова
+                raise src.SourceError("plati: пауза после таймаута")
             offers = await asyncio.wait_for(self.src.plati_search(query, pages=1 if LIVE_BUDGET else 2), LIVE_BUDGET)
         except (src.SourceError, asyncio.TimeoutError):
             offers, plati_ok = [], False
+            if LIVE_BUDGET:
+                self.plati_down_until = time.monotonic() + 120
         try:
             game, exclude, official, w = await asyncio.wait_for(steam_task, LIVE_BUDGET)
             warnings += w
