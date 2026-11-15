@@ -99,12 +99,20 @@ def telegram_login(db: Database, data: dict, bot_token: str | None) -> int:
         raise AuthError(401, "Подпись Telegram не сошлась")
     if _now().timestamp() - int(data.get("auth_date", 0)) > TG_MAX_AGE:
         raise AuthError(401, "Данные Telegram устарели — войдите ещё раз")
-    login_id = f"tg:{int(data['id'])}"  # вместо почты; пароля у такого аккаунта нет
     name = " ".join(x for x in (data.get("first_name"), data.get("last_name")) if x) or data.get("username")
+    return telegram_user(db, int(data["id"]), name)
+
+
+def telegram_user(db: Database, tg_id: int, name: str | None) -> int:
+    """Аккаунт по Telegram id: найти или создать (регистрация происходит при первом входе)."""
+    login_id = f"tg:{tg_id}"  # вместо почты; пароля у такого аккаунта нет
     u = db.user_by_email(login_id)
     if u:
         return u["id"]
     uid = db.create_user(login_id, name, "", secrets.token_hex(16))  # пустой хэш: войти паролем нельзя
     if uid is None:
-        raise AuthError(409, "Не удалось создать аккаунт")
+        u = db.user_by_email(login_id)  # параллельный запрос успел создать
+        if not u:
+            raise AuthError(409, "Не удалось создать аккаунт")
+        return u["id"]
     return uid

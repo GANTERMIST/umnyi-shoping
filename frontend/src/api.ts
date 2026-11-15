@@ -186,6 +186,7 @@ export const api = {
   logout: () => req<{ ok: boolean }>('/api/auth/logout', json({})),
   telegramConfig: () => req<{ bot: string | null }>('/api/auth/telegram/config'),
   telegram: (user: TelegramUser) => req<Me>('/api/auth/telegram', json(user)),
+  telegramPoll: (code: string) => req<Me | { pending: true }>('/api/auth/telegram/poll', json({ code })),
   me: () => req<Me>('/api/me'),
   putProfile: (p: Profile) => req<Me>('/api/me/profile', json(p, 'PUT')),
   putFavorites: (f: Favorite[]) => req<Me>('/api/me/favorites', json(f, 'PUT')),

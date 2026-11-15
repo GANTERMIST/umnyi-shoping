@@ -71,6 +71,11 @@ CREATE TABLE IF NOT EXISTS user_data (
     profile TEXT NOT NULL DEFAULT '{}',
     favorites TEXT NOT NULL DEFAULT '[]'
 );
+CREATE TABLE IF NOT EXISTS tg_login (
+    code TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS feedback (
     id INTEGER PRIMARY KEY,
     helpful INTEGER NOT NULL,
@@ -284,6 +289,21 @@ class Database:
         with self.lock, self.db:
             self.db.execute("DELETE FROM user_session WHERE expires_at < ?", (now(),))
             self.db.execute("INSERT INTO user_session VALUES (?,?,?)", (token_hash, uid, expires_at))
+
+    def tg_login_put(self, code: str, uid: int) -> None:
+        with self.lock, self.db:
+            self.db.execute("INSERT OR REPLACE INTO tg_login VALUES (?,?,?)", (code, uid, now()))
+
+    def tg_login_take(self, code: str, max_age_s: int) -> int | None:
+        """Код одноразовый: при успешном чтении удаляется. Старше max_age_s — не действует."""
+        import datetime as _dt
+        since = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(seconds=max_age_s)).isoformat(timespec="seconds")
+        with self.lock, self.db:
+            r = self.db.execute("SELECT user_id FROM tg_login WHERE code=? AND created_at >= ?", (code, since)).fetchone()
+            if r:
+                self.db.execute("DELETE FROM tg_login WHERE code=?", (code,))
+            self.db.execute("DELETE FROM tg_login WHERE created_at < ?", (since,))
+            return r[0] if r else None
 
     def session_user(self, token_hash: str) -> int | None:
         r = self.db.execute("SELECT user_id FROM user_session WHERE token_hash=? AND expires_at > ?",

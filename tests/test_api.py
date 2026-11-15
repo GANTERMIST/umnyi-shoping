@@ -391,6 +391,42 @@ class ApiTest(unittest.TestCase):
         self.tmp.cleanup()
         os.environ.pop("DATA_DIR", None)
 
+    def test_telegram_bot_login(self):
+        from app import tgbot
+        token = "123:TEST"
+        os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_BOT_USERNAME"] = token, "shop_bot"
+        try:
+            c, code = self.client, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+            self.assertEqual(c.post("/api/auth/telegram/poll", json={"code": code}).status_code, 202)  # ещё не нажал «Старт»
+            upd = {"message": {"from": {"id": 77, "first_name": "Паша"}, "chat": {"id": 77}, "text": f"/start {code}"}}
+            self.assertEqual(c.post("/api/telegram/webhook", json=upd).status_code, 403)  # без секрета — чужой запрос
+            hdr = {"X-Telegram-Bot-Api-Secret-Token": tgbot.webhook_secret(token)}
+            r = c.post("/api/telegram/webhook", json=upd, headers=hdr)
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(r.json()["method"], "sendMessage")
+            link = r.json()["reply_markup"]["inline_keyboard"][0][0]["url"]
+            r = c.post("/api/auth/telegram/poll", json={"code": code})
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(r.json()["user"]["name"], "Паша")
+            uid = r.json()["user"]["id"]
+            self.assertEqual(c.post("/api/auth/telegram/poll", json={"code": code}).status_code, 202)  # код одноразовый
+            # ссылка из сообщения бота входит в тот же аккаунт
+            c.cookies.clear()
+            r = c.get(link[link.index("/api/"):], follow_redirects=False)
+            self.assertEqual((r.status_code, r.headers["location"]), (303, "/profile"))
+            self.assertEqual(c.get("/api/me").json()["user"]["id"], uid)
+            # подделанная ссылка не входит
+            c.cookies.clear()
+            bad = link[link.index("/api/"):-3] + "abc"
+            self.assertEqual(c.get(bad, follow_redirects=False).headers["location"], "/login?tg=expired")
+            self.assertEqual(c.get("/api/me").status_code, 401)
+            # просто /start — подсказка со ссылкой на сайт
+            r = c.post("/api/telegram/webhook", headers=hdr,
+                       json={"message": {"from": {"id": 77}, "chat": {"id": 77}, "text": "/start"}})
+            self.assertIn("Войти через Telegram", r.json()["text"])
+        finally:
+            os.environ.pop("TELEGRAM_BOT_TOKEN"); os.environ.pop("TELEGRAM_BOT_USERNAME")
+
     def test_telegram_login(self):
         import hashlib, hmac, time
         token = "123:TEST"

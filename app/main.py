@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -12,13 +13,13 @@ from pathlib import Path
 from typing import Annotated
 
 from dotenv import load_dotenv
-from fastapi import Cookie, FastAPI, Header, HTTPException, Query, Response
+from fastapi import Cookie, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
-from . import assistant, auth
+from . import assistant, auth, tgbot
 from .schemas import (AssistantIn, AssistantOut, AuthIn, CatalogItem, FavoriteItem, GameCardOut, HistoryOut, IdsIn,
-                      FeedbackIn, FeedbackStats, MeOut, NluIn, NluOut, OfferOut, Profile, SearchOut, Sort, StoreOut, TelegramAuthIn, UserOut)
+                      FeedbackIn, FeedbackStats, MeOut, NluIn, NluOut, OfferOut, Profile, SearchOut, Sort, StoreOut, TelegramAuthIn, TelegramPollIn, UserOut)
 from .service import Service
 from .sources import SourceError, Sources
 
@@ -237,9 +238,69 @@ async def login(body: AuthIn) -> JSONResponse:
 
 
 @app.get("/api/auth/telegram/config", tags=["пользователь"], summary="Имя бота для кнопки «Войти через Telegram»")
-async def telegram_config() -> dict:
-    bot = os.getenv("TELEGRAM_BOT_USERNAME")
-    return {"bot": bot.lstrip("@") if bot and os.getenv("TELEGRAM_BOT_TOKEN") else None}
+async def telegram_config(request: Request) -> dict:
+    bot = tgbot.bot_username()
+    if bot:
+        await tgbot.ensure_webhook(_public_url(request))
+    return {"bot": bot}
+
+
+def _public_url(request: Request) -> str:
+    if os.getenv("PUBLIC_URL"):
+        return os.environ["PUBLIC_URL"].rstrip("/")
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    return f"{proto}://{host}"
+
+
+@app.post("/api/telegram/webhook", include_in_schema=False)
+async def telegram_webhook(request: Request) -> dict:
+    """Обновления от Telegram: /start <код> — вход на сайт. Ответ бота — в теле ответа."""
+    tok = tgbot.token()
+    got = request.headers.get("x-telegram-bot-api-secret-token", "")
+    if not tok or not hmac.compare_digest(got, tgbot.webhook_secret(tok)):
+        raise HTTPException(403, "Чужой запрос")
+    msg = (await request.json()).get("message") or {}
+    user, chat = msg.get("from") or {}, (msg.get("chat") or {}).get("id")
+    text = (msg.get("text") or "").strip()
+    if not chat or not user.get("id") or user.get("is_bot"):
+        return {}
+    site = _public_url(request)
+    parts = text.split(maxsplit=1)
+    if parts and parts[0].split("@")[0] == "/start" and len(parts) == 2 and tgbot.CODE_RE.match(parts[1]):
+        name = tgbot.tg_name(user)
+        uid = _auth_call(auth.telegram_user, svc().db, int(user["id"]), name)
+        svc().db.tg_login_put(parts[1], uid)
+        link = f"{site}/api/auth/telegram/link?t={tgbot.sign_link(tok, int(user['id']), name)}"
+        return tgbot.reply(chat, f"Готово, {name or 'друг'}! Вход на «Умный Шопинг» выполнен — вернитесь на вкладку сайта.\n\n"
+                                 "Если вкладка закрыта, нажмите кнопку ниже (ссылка действует 10 минут).",
+                           ("Открыть сайт", link))
+    return tgbot.reply(chat, "Это бот входа на «Умный Шопинг» — сравнение цен на игры.\n"
+                             "Чтобы войти, откройте сайт и нажмите «Войти через Telegram».", ("Открыть сайт", site + "/login"))
+
+
+@app.post("/api/auth/telegram/poll", tags=["пользователь"],
+          summary="Вход через бота: вкладка сайта спрашивает, нажал ли пользователь «Старт»")
+async def telegram_poll(body: TelegramPollIn) -> JSONResponse:
+    uid = svc().db.tg_login_take(body.code, tgbot.CODE_TTL)
+    if not uid:
+        return JSONResponse({"pending": True}, status_code=202)
+    return _session_response(uid)
+
+
+@app.get("/api/auth/telegram/link", include_in_schema=False)
+async def telegram_link(t: str) -> RedirectResponse:
+    """Подписанная ссылка из сообщения бота: входит в аккаунт и открывает профиль."""
+    tok = tgbot.token()
+    got = tgbot.check_link(tok, t) if tok else None
+    if not got:
+        return RedirectResponse("/login?tg=expired", status_code=303)
+    uid = _auth_call(auth.telegram_user, svc().db, *got)
+    token = auth.new_session(svc().db, uid)
+    resp = RedirectResponse("/profile", status_code=303)
+    resp.set_cookie(auth.COOKIE, token, max_age=auth.SESSION_DAYS * 86400, httponly=True, samesite="lax",
+                    secure=os.getenv("COOKIE_SECURE") == "1")
+    return resp
 
 
 @app.post("/api/auth/telegram", response_model=MeOut, tags=["пользователь"],

@@ -347,3 +347,8 @@ input.target { width: 100px; height: 32px; padding: 4px 8px; text-align: right; 
 
 .tg-login { display: grid; gap: 8px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
 .tg-login iframe { max-width: 100%; }
+.tg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: #2aabee; border-color: #2aabee; color: #fff; }
+.tg-btn:hover { background: #229ed9; border-color: #229ed9; }
+.tg-wait p { margin: 0 0 6px; }
+.tg-wait .spinner { margin-right: 6px; vertical-align: -2px; }
+button.link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; }

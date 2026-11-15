@@ -192,6 +192,10 @@ class FeedbackStats(BaseModel):
     by_place: dict[str, dict[str, int]]
 
 
+class TelegramPollIn(BaseModel):
+    code: str = Field(pattern=r"^[A-Za-z0-9_-]{16,64}$", description="Код из ссылки t.me/<бот>?start=<код>")
+
+
 class TelegramAuthIn(BaseModel):
     """Что присылает Telegram Login Widget (https://core.telegram.org/widgets/login)."""
     id: int
