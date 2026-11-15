@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from collections import Counter
 from dataclasses import asdict
@@ -14,6 +15,10 @@ from pathlib import Path
 from . import sources as src
 from .db import Database
 from .schemas import CatalogItem, Facets, GameCardOut, GameOut, HistoryOut, OfferOut, PricePoint, SearchOut
+
+# На хостинге (Vercel) у функции лимит времени, а Plati из-за рубежа отвечает медленно:
+# не уложились — берём цены продавцов из базы. Локально ждём без ограничения.
+LIVE_BUDGET: float | None = float(os.environ['LIVE_BUDGET']) if os.getenv('LIVE_BUDGET') else (9.0 if os.getenv('VERCEL') else None)
 
 
 class TTLCache:
@@ -99,13 +104,13 @@ class Service:
         steam_task = asyncio.create_task(self._steam_and_official(query))
         plati_ok = True
         try:
-            offers = await self.src.plati_search(query)
-        except src.SourceError:
+            offers = await asyncio.wait_for(self.src.plati_search(query, pages=1 if LIVE_BUDGET else 2), LIVE_BUDGET)
+        except (src.SourceError, asyncio.TimeoutError):
             offers, plati_ok = [], False
         try:
-            game, exclude, official, w = await steam_task
+            game, exclude, official, w = await asyncio.wait_for(steam_task, LIVE_BUDGET)
             warnings += w
-        except src.SourceError:
+        except (src.SourceError, asyncio.TimeoutError):
             game, exclude, official = None, [], []
             warnings.append("Steam не ответил — показываем предложения без карточки игры")
         if game:  # продавцы пишут то по-английски, то по-русски — подходит любое из названий
@@ -135,6 +140,12 @@ class Service:
             self.cache.put(key, result)
         return result
 
+    async def _reviews(self, appid: int) -> tuple[int | None, int | None]:
+        try:
+            return await asyncio.wait_for(self.src.steam_reviews(appid), 4 if LIVE_BUDGET else None)
+        except asyncio.TimeoutError:
+            return None, None
+
     async def search(self, query: str, kinds: list[str] | None = None, platforms: list[str] | None = None,
                      max_price: float | None = None, trusted_only: bool = False,
                      sort: str = "price", limit: int = 50, stores: list[str] | None = None) -> SearchOut:
@@ -148,7 +159,7 @@ class Service:
                and (not trusted_only or o.trusted)]
         res = _sort(res, sort)[:limit]
         if game and game.steam_review_pct is None:
-            game.steam_review_pct, game.steam_reviews = await self.src.steam_reviews(game.appid)
+            game.steam_review_pct, game.steam_reviews = await self._reviews(game.appid)
             if game.steam_review_pct is not None:
                 self.db.save_game(game)
         return SearchOut(query=query, game=_game_out(game), total_found=len(offers), matched=len(matched),
@@ -167,7 +178,7 @@ class Service:
         found = await self.search(game.name, sort="price", limit=200)
         g = found.game if found.game and found.game.appid == appid else _game_out(game)
         if g.steam_review_pct is None:
-            g.steam_review_pct, g.steam_reviews = await self.src.steam_reviews(appid)
+            g.steam_review_pct, g.steam_reviews = await self._reviews(appid)
         best: dict[str, OfferOut] = {}
         for o in found.offers:
             if o.trusted and o.kind not in best:
