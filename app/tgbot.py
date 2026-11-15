@@ -102,12 +102,13 @@ async def ensure_webhook(base_url: str) -> None:
     hx.setLevel(logging.WARNING)  # httpx пишет в журнал адрес запроса, а в нём токен бота
     try:
         async with httpx.AsyncClient(timeout=8) as c:
-            info = (await c.get(f"{api}/getWebhookInfo")).json().get("result") or {}
-            if info.get("url") != url:
-                r = (await c.post(f"{api}/setWebhook", json={
-                    "url": url, "secret_token": webhook_secret(tok), "allowed_updates": ["message"],
-                    "drop_pending_updates": True})).json()
-                log.info("setWebhook: %s", r.get("description") or r.get("ok"))
+            # setWebhook каждый раз при запуске: секрет выводится из токена, а Telegram его не показывает —
+            # после смены токена (/revoke) старый секрет иначе остался бы и вебхук отвечал бы 403
+            r = (await c.post(f"{api}/setWebhook", json={
+                "url": url, "secret_token": webhook_secret(tok), "allowed_updates": ["message"]})).json()
+            log.info("setWebhook: %s", r.get("description") or r.get("ok"))
+            if not r.get("ok"):
+                return
         _hooked.add(base_url)
     except (httpx.HTTPError, ValueError) as e:  # не получилось — попробуем при следующем запросе
         log.warning("webhook не настроен: %s", type(e).__name__)
