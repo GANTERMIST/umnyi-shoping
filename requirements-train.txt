@@ -1,0 +1,3 @@
+# Только для обучения своей модели ShopNLU (python -m app.nlu.train). Сайту хватает requirements.txt.
+-r requirements.txt
+torch>=2.2

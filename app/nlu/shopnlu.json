@@ -1,0 +1,81 @@
+{
+  "name": "ShopNLU",
+  "version": "2026-11-10",
+  "params": 836251,
+  "architecture": "hash-эмбеддинги слов и n-грамм (48) → BiGRU 2×64 → метки слов (Витерби) + намерение/тип/платформа",
+  "labels": {
+    "tags": [
+      "O",
+      "B-GAME",
+      "I-GAME",
+      "B-PRICE",
+      "I-PRICE",
+      "B-GENRE",
+      "I-GENRE"
+    ],
+    "intents": [
+      "buy",
+      "recommend",
+      "review",
+      "compare",
+      "faq",
+      "greet",
+      "other"
+    ],
+    "kinds": [
+      "any",
+      "ключ",
+      "гифт",
+      "аккаунт",
+      "пополнение",
+      "магазин"
+    ],
+    "platforms": [
+      "any",
+      "Steam",
+      "Xbox",
+      "PlayStation",
+      "Nintendo",
+      "Epic",
+      "GOG"
+    ]
+  },
+  "data": {
+    "train": 30000,
+    "dev_unseen_games": 2000,
+    "train_games": 164,
+    "held_out_games": 28,
+    "manual_test": 82,
+    "blind_test": 35
+  },
+  "metrics": {
+    "dev_unseen_games": {
+      "n": 2000,
+      "slot_f1": 0.958,
+      "intent": 1.0,
+      "kind": 0.993,
+      "platform": 1.0
+    },
+    "manual_test": {
+      "n": 82,
+      "intent": 1.0,
+      "kind": 0.988,
+      "platform": 1.0,
+      "game": 0.976,
+      "price": 1.0,
+      "genre": 1.0,
+      "frame": 0.963
+    },
+    "blind_test": {
+      "n": 35,
+      "intent": 0.943,
+      "kind": 1.0,
+      "platform": 1.0,
+      "game": 0.943,
+      "price": 1.0,
+      "genre": 1.0,
+      "frame": 0.914
+    }
+  },
+  "train_seconds": 244
+}

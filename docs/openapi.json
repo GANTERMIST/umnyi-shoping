@@ -1,0 +1,830 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Умный Шопинг API",
+  "description": "Агрегатор цен на игры и игровые товары: поиск предложений, карточка игры, история цены, ИИ-ассистент.",
+  "version": "1.0.0"
+ },
+ "paths": {
+  "/api/health": {
+   "get": {
+    "tags": [
+     "служебное"
+    ],
+    "summary": "Health",
+    "operationId": "health_api_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Health Api Health Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/search": {
+   "get": {
+    "tags": [
+     "поиск"
+    ],
+    "summary": "Поиск предложений по игре или товару",
+    "operationId": "search_api_search_get",
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 2,
+       "maxLength": 100,
+       "description": "Название игры или товара",
+       "examples": [
+        "elden ring"
+       ],
+       "title": "Q"
+      },
+      "description": "Название игры или товара"
+     },
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по типу, можно несколько: kind=ключ&kind=гифт",
+       "title": "Kind"
+      },
+      "description": "Фильтр по типу, можно несколько: kind=ключ&kind=гифт"
+     },
+     {
+      "name": "platform",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Фильтр по платформе, можно несколько",
+       "title": "Platform"
+      },
+      "description": "Фильтр по платформе, можно несколько"
+     },
+     {
+      "name": "max_price",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number",
+         "exclusiveMinimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Максимальная цена, ₽",
+       "title": "Max Price"
+      },
+      "description": "Максимальная цена, ₽"
+     },
+     {
+      "name": "trusted_only",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Только надёжные продавцы",
+       "default": false,
+       "title": "Trusted Only"
+      },
+      "description": "Только надёжные продавцы"
+     },
+     {
+      "name": "sort",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "price",
+        "trust",
+        "sold"
+       ],
+       "type": "string",
+       "description": "price — дешевле сверху (надёжные первыми), trust — по надёжности, sold — по продажам",
+       "default": "price",
+       "title": "Sort"
+      },
+      "description": "price — дешевле сверху (надёжные первыми), trust — по надёжности, sold — по продажам"
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SearchOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/games/{appid}": {
+   "get": {
+    "tags": [
+     "игры"
+    ],
+    "summary": "Карточка игры: данные Steam, все предложения и лучшее по каждому типу",
+    "operationId": "game_api_games__appid__get",
+    "parameters": [
+     {
+      "name": "appid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Appid"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GameCardOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/offers/{offer_id}/history": {
+   "get": {
+    "tags": [
+     "игры"
+    ],
+    "summary": "История цены предложения (для графика)",
+    "operationId": "history_api_offers__offer_id__history_get",
+    "parameters": [
+     {
+      "name": "offer_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Offer Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HistoryOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/assistant": {
+   "post": {
+    "tags": [
+     "ассистент"
+    ],
+    "summary": "ИИ-ассистент: вопрос пользователя → ответ и рекомендованные предложения",
+    "operationId": "ask_api_assistant_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AssistantIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AssistantOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "AssistantIn": {
+    "properties": {
+     "message": {
+      "type": "string",
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Message",
+      "examples": [
+       "где дешевле всего купить ключ elden ring в стим до 2000"
+      ]
+     },
+     "history": {
+      "items": {
+       "$ref": "#/components/schemas/ChatTurn"
+      },
+      "type": "array",
+      "maxItems": 20,
+      "title": "History",
+      "description": "Предыдущие реплики (необязательно)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "message"
+    ],
+    "title": "AssistantIn"
+   },
+   "AssistantOut": {
+    "properties": {
+     "answer": {
+      "type": "string",
+      "title": "Answer",
+      "description": "Ответ ассистента, обычный текст"
+     },
+     "offers": {
+      "items": {
+       "$ref": "#/components/schemas/OfferOut"
+      },
+      "type": "array",
+      "title": "Offers",
+      "description": "Рекомендованные предложения — показать карточками под ответом"
+     },
+     "game": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/GameOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "engine": {
+      "type": "string",
+      "enum": [
+       "claude",
+       "rules"
+      ],
+      "title": "Engine",
+      "description": "claude — ответ модели; rules — запасной режим без ключа API"
+     }
+    },
+    "type": "object",
+    "required": [
+     "answer",
+     "offers",
+     "engine"
+    ],
+    "title": "AssistantOut"
+   },
+   "ChatTurn": {
+    "properties": {
+     "role": {
+      "type": "string",
+      "enum": [
+       "user",
+       "assistant"
+      ],
+      "title": "Role"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text"
+     }
+    },
+    "type": "object",
+    "required": [
+     "role",
+     "text"
+    ],
+    "title": "ChatTurn"
+   },
+   "Facets": {
+    "properties": {
+     "kinds": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Kinds",
+      "description": "Сколько предложений каждого типа (до фильтрации) — для чипов-фильтров"
+     },
+     "platforms": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Platforms"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kinds",
+     "platforms"
+    ],
+    "title": "Facets"
+   },
+   "GameCardOut": {
+    "properties": {
+     "game": {
+      "$ref": "#/components/schemas/GameOut"
+     },
+     "offers": {
+      "items": {
+       "$ref": "#/components/schemas/OfferOut"
+      },
+      "type": "array",
+      "title": "Offers"
+     },
+     "best": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/OfferOut"
+      },
+      "type": "object",
+      "title": "Best",
+      "description": "Самое дешёвое надёжное предложение по каждому типу"
+     }
+    },
+    "type": "object",
+    "required": [
+     "game",
+     "offers",
+     "best"
+    ],
+    "title": "GameCardOut"
+   },
+   "GameOut": {
+    "properties": {
+     "appid": {
+      "type": "integer",
+      "title": "Appid",
+      "examples": [
+       1245620
+      ]
+     },
+     "name": {
+      "type": "string",
+      "title": "Name",
+      "examples": [
+       "ELDEN RING"
+      ]
+     },
+     "genres": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Genres"
+     },
+     "image": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image"
+     },
+     "metacritic": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Metacritic"
+     },
+     "release": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Release"
+     },
+     "steam_review_pct": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Steam Review Pct",
+      "description": "% положительных отзывов Steam (может быть null, если Steam не ответил)"
+     },
+     "steam_reviews": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Steam Reviews"
+     }
+    },
+    "type": "object",
+    "required": [
+     "appid",
+     "name",
+     "genres",
+     "image",
+     "metacritic",
+     "release"
+    ],
+    "title": "GameOut"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "HistoryOut": {
+    "properties": {
+     "offer_id": {
+      "type": "string",
+      "title": "Offer Id"
+     },
+     "points": {
+      "items": {
+       "$ref": "#/components/schemas/PricePoint"
+      },
+      "type": "array",
+      "title": "Points"
+     }
+    },
+    "type": "object",
+    "required": [
+     "offer_id",
+     "points"
+    ],
+    "title": "HistoryOut"
+   },
+   "OfferOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id",
+      "description": "«магазин:id» — стабильный ключ предложения",
+      "examples": [
+       "plati:3412257"
+      ]
+     },
+     "store": {
+      "type": "string",
+      "title": "Store",
+      "examples": [
+       "plati.market"
+      ]
+     },
+     "title": {
+      "type": "string",
+      "title": "Title",
+      "description": "Название как у продавца"
+     },
+     "price": {
+      "type": "number",
+      "title": "Price",
+      "examples": [
+       1290.0
+      ]
+     },
+     "currency": {
+      "type": "string",
+      "title": "Currency",
+      "examples": [
+       "RUB"
+      ]
+     },
+     "url": {
+      "type": "string",
+      "title": "Url",
+      "description": "Ссылка на покупку"
+     },
+     "seller": {
+      "type": "string",
+      "title": "Seller"
+     },
+     "seller_rating": {
+      "type": "number",
+      "title": "Seller Rating"
+     },
+     "sold": {
+      "type": "integer",
+      "title": "Sold",
+      "description": "Сколько раз продано"
+     },
+     "reviews_pos": {
+      "type": "integer",
+      "title": "Reviews Pos"
+     },
+     "reviews_neg": {
+      "type": "integer",
+      "title": "Reviews Neg"
+     },
+     "returns": {
+      "type": "integer",
+      "title": "Returns"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "ключ",
+       "гифт",
+       "аккаунт",
+       "пополнение",
+       "другое"
+      ],
+      "title": "Kind"
+     },
+     "platform": {
+      "type": "string",
+      "title": "Platform",
+      "description": "Steam, Xbox, PlayStation, Nintendo, GOG, Epic, EA, Ubisoft или «?»",
+      "examples": [
+       "Steam"
+      ]
+     },
+     "trusted": {
+      "type": "boolean",
+      "title": "Trusted",
+      "description": "≥5 положительных отзывов и не больше 10% отрицательных"
+     },
+     "trust_score": {
+      "type": "number",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Trust Score",
+      "description": "Сглаженная доля положительных отзывов — для сортировки и шкалы надёжности"
+     },
+     "image": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "store",
+     "title",
+     "price",
+     "currency",
+     "url",
+     "seller",
+     "seller_rating",
+     "sold",
+     "reviews_pos",
+     "reviews_neg",
+     "returns",
+     "kind",
+     "platform",
+     "trusted",
+     "trust_score"
+    ],
+    "title": "OfferOut"
+   },
+   "PricePoint": {
+    "properties": {
+     "ts": {
+      "type": "string",
+      "title": "Ts",
+      "description": "ISO-время замера"
+     },
+     "price": {
+      "type": "number",
+      "title": "Price"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ts",
+     "price"
+    ],
+    "title": "PricePoint"
+   },
+   "SearchOut": {
+    "properties": {
+     "query": {
+      "type": "string",
+      "title": "Query"
+     },
+     "game": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/GameOut"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Игра из Steam, если нашлась; для пополнений и не-Steam товаров — null"
+     },
+     "total_found": {
+      "type": "integer",
+      "title": "Total Found",
+      "description": "Всего предложений в магазинах по запросу"
+     },
+     "matched": {
+      "type": "integer",
+      "title": "Matched",
+      "description": "Из них относятся к этой игре (без DLC и других игр серии)"
+     },
+     "facets": {
+      "$ref": "#/components/schemas/Facets"
+     },
+     "offers": {
+      "items": {
+       "$ref": "#/components/schemas/OfferOut"
+      },
+      "type": "array",
+      "title": "Offers"
+     },
+     "warnings": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Warnings",
+      "default": []
+     }
+    },
+    "type": "object",
+    "required": [
+     "query",
+     "game",
+     "total_found",
+     "matched",
+     "facets",
+     "offers"
+    ],
+    "title": "SearchOut"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  }
+ }
+}
