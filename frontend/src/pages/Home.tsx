@@ -41,7 +41,7 @@ export default function Home() {
         <div className="chips">
           {CHIPS.map(c => <button key={c} className="chip" onClick={() => ask(c)}>{c}</button>)}
         </div>
-        <p className="muted small">Ищем у продавцов Plati.market и в официальных магазинах (Steam, GOG, Humble, Fanatical…), проверяем надёжность продавца и регион активации.</p>
+        <p className="muted small">Ищем у продавцов Plati.market, в магазине SteamBuy и в официальных магазинах (Steam, GOG, Humble, Fanatical…), проверяем надёжность продавца и регион активации.</p>
       </section>
 
       {err && <p className="error">{err}</p>}

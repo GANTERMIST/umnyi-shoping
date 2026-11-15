@@ -6,6 +6,7 @@ DLC, склейка с игрой и надёжность продавца. Се
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -286,6 +287,39 @@ class Sources:
                 note="Официальный магазин: цена в долларах, оплата зарубежной картой",
             ))
         return sorted(out, key=lambda o: o.price), []
+
+    # SteamBuy (steambuy.com): российский магазин гифтов и ключей Steam, цены в рублях.
+    # Открытого API нет, но страница поиска отдаёт каталог готовым JSON (window.initialCatalogData),
+    # и у каждого товара есть Steam appid — по нему сопоставляем без ошибок по названию.
+    async def steambuy_offers(self, game: Game) -> list[Offer]:
+        try:
+            r = await self.http.get("https://steambuy.com/catalog/", params={"q": game.name},
+                                    headers={"Accept": "text/html"})
+            r.raise_for_status()
+            m = re.search(r"window\.initialCatalogData\s*=\s*(\{.*?\});\s*$", r.text, re.S | re.M)
+            items = json.loads(m.group(1)).get("items", []) if m else []
+        except (httpx.HTTPError, ValueError, AttributeError):
+            return []
+        out = []
+        for it in items:
+            try:
+                if int(it.get("appid_steam") or 0) != game.appid or not it.get("nal") or not it.get("price"):
+                    continue
+                price, rrc = float(it["price"]), float(it.get("price_rrc") or 0)
+            except (TypeError, ValueError):
+                continue
+            gift = bool(it.get("is_gift"))
+            out.append(Offer(
+                id=f"steambuy:{it['id_good']}", store="SteamBuy", title=f"{it.get('title') or game.name} — SteamBuy",
+                price=price, currency="RUB", url="https://steambuy.com" + str(it.get("url") or ""),
+                seller="SteamBuy", seller_rating=0, sold=0, reviews_pos=0, reviews_neg=0, returns=0,
+                kind="гифт" if gift else "ключ", platform="Steam", trusted=True, trust_score=0.95,
+                image=None, region="RU" if it.get("catalog_offer_ru") else None,
+                old_price=round(price * 100 / (100 - it["discount_percent"])) if it.get("discount_percent") else None,
+                note=("Магазин SteamBuy: " + ("подарок в ваш Steam-аккаунт" if gift else "ключ активации")
+                      + (f", цена в Steam для РФ — {rrc:.0f} ₽" if rrc else "")),
+            ))
+        return sorted(out, key=lambda o: o.price)
 
     async def top_games(self, n: int = 50) -> list[int]:
         """appid самых популярных игр Steam (в топе много бесплатных — их отсеет загрузчик)."""

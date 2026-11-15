@@ -259,21 +259,17 @@ input.target { width: 100px; height: 32px; padding: 4px 8px; text-align: right; 
 
 /* график */
 .chart { margin: 0; }
-.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-.periods { display: flex; border: 1px solid var(--line-strong); }
-.periods button { background: none; border: 0; color: var(--muted); font: 500 .7rem var(--mono); padding: 6px 12px; cursor: pointer; }
-.periods button + button { border-left: 1px solid var(--line-strong); }
-.periods button.on { background: var(--invert-bg); color: var(--invert-text); }
-.chart svg { width: 100%; height: auto; max-height: 260px; }
-.chart .grid { stroke: var(--line); }
-.chart .axis { fill: var(--muted); font-size: 11px; font-family: var(--mono); }
-.chart .line { fill: none; stroke: var(--text); stroke-width: 1.5; }
-.chart .dot { fill: var(--bg); stroke: var(--text); stroke-width: 1.5; cursor: pointer; }
-.chart .tip { fill: var(--text); font: 600 12px var(--mono); }
-.minmax { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); margin-top: 12px; }
-.minmax div { padding: 10px 14px; font: .8rem var(--mono); color: var(--muted); }
-.minmax div + div { border-left: 1px solid var(--line); }
-.minmax b { color: var(--text); font-weight: 500; margin-left: 8px; }
+.chart-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.chart-title { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.chart-now { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; font-size: .8rem; }
+.chart-now b { font: 600 1.4rem var(--mono); color: var(--text); }
+.periods { display: flex; gap: 4px; }
+.periods button { background: none; border: 0; color: var(--muted); font: 500 .72rem var(--mono); padding: 4px 6px; cursor: pointer; }
+.periods button.on { color: var(--text); box-shadow: inset 0 -1px 0 var(--text); }
+.chart svg { display: block; width: 100%; height: 120px; cursor: crosshair; }
+.chart .line { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.chart .cursor { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
+.chart-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; font: .72rem var(--mono); color: var(--muted); }
 
 /* помощник: диалог + условия подбора */
 .chat-page { display: grid; grid-template-columns: 1fr 280px; border: 1px solid var(--line); }
@@ -348,3 +344,6 @@ input.target { width: 100px; height: 32px; padding: 4px 8px; text-align: right; 
   .compare-bar span { min-width: 0; }
   main.container { padding-top: 20px; }
 }
+
+.tg-login { display: grid; gap: 8px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+.tg-login iframe { max-width: 100%; }

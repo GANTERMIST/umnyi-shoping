@@ -24,7 +24,7 @@ export default function ProfilePage() {
     <div className="auth card wide">
       <h1>Профиль покупателя</h1>
       {user
-        ? <p className="muted">Вы вошли как <b>{user.email}</b>. Профиль и избранное сохраняются в аккаунте.</p>
+        ? <p className="muted">Вы вошли как <b>{user.email.startsWith('tg:') ? `${user.name ?? 'пользователь'} (Telegram)` : user.email}</b>. Профиль и избранное сохраняются в аккаунте.</p>
         : <p className="muted">Профиль хранится в этом браузере. <Link to="/login">Войдите</Link>, чтобы он был на всех устройствах.</p>}
       <form onSubmit={save}>
         <label>Бюджет на игру, ₽

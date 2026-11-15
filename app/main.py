@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from . import assistant, auth
 from .schemas import (AssistantIn, AssistantOut, AuthIn, CatalogItem, FavoriteItem, GameCardOut, HistoryOut, IdsIn,
-                      FeedbackIn, FeedbackStats, MeOut, NluIn, NluOut, OfferOut, Profile, SearchOut, Sort, StoreOut, UserOut)
+                      FeedbackIn, FeedbackStats, MeOut, NluIn, NluOut, OfferOut, Profile, SearchOut, Sort, StoreOut, TelegramAuthIn, UserOut)
 from .service import Service
 from .sources import SourceError, Sources
 
@@ -233,6 +233,19 @@ async def register(body: AuthIn) -> JSONResponse:
 @app.post("/api/auth/login", response_model=MeOut, tags=["пользователь"], summary="Вход")
 async def login(body: AuthIn) -> JSONResponse:
     uid = _auth_call(auth.login, svc().db, body.email, body.password)
+    return _session_response(uid)
+
+
+@app.get("/api/auth/telegram/config", tags=["пользователь"], summary="Имя бота для кнопки «Войти через Telegram»")
+async def telegram_config() -> dict:
+    bot = os.getenv("TELEGRAM_BOT_USERNAME")
+    return {"bot": bot.lstrip("@") if bot and os.getenv("TELEGRAM_BOT_TOKEN") else None}
+
+
+@app.post("/api/auth/telegram", response_model=MeOut, tags=["пользователь"],
+          summary="Вход/регистрация через Telegram: данные виджета с подписью бота")
+async def telegram_auth(body: TelegramAuthIn) -> JSONResponse:
+    uid = _auth_call(auth.telegram_login, svc().db, body.model_dump(), os.getenv("TELEGRAM_BOT_TOKEN"))
     return _session_response(uid)
 
 

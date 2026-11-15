@@ -30,7 +30,7 @@ export default function Compare() {
     { label: 'Доставка', get: o => delivery(o) },
     { label: 'Возврат и гарантия', get: o => guarantee(o) },
     { label: 'Надёжность', get: o => trustLabel(o), best: o => o.trust_score === maxTrust },
-    { label: 'Отзывы', get: o => (o.kind === 'магазин' ? '—' : `+${o.reviews_pos} / −${o.reviews_neg}`) },
+    { label: 'Отзывы', get: o => (o.store !== 'plati.market' ? '—' : `+${o.reviews_pos} / −${o.reviews_neg}`) },
     { label: 'Продано', get: o => (o.kind === 'магазин' ? '—' : o.sold.toLocaleString('ru-RU')) },
   ]
   return (

@@ -74,13 +74,13 @@ export function OfferTable({ offers, appid, onSelect, selected }: {
                   </td>
                   <td>
                     <div>{o.kind === 'магазин' ? o.store : o.seller}</div>
-                    <div className="muted small">{o.kind === 'магазин' ? 'официальный' : o.store}</div>
+                    <div className="muted small">{o.kind === 'магазин' ? 'официальный' : o.store === 'plati.market' ? o.store : 'магазин'}</div>
                   </td>
                   <td><span className={`kind k-${o.kind}`} title={KIND_HINT[o.kind]}>{KIND_LABEL[o.kind]}</span></td>
                   <td>
                     <span className={o.trusted ? 'ok' : 'warn'}>{trustLabel(o)}</span>
-                    {o.kind !== 'магазин' && <div className="muted small">+{o.reviews_pos} / −{o.reviews_neg}{o.returns ? `, возвратов ${o.returns}` : ''}</div>}
-                    {o.kind !== 'магазин' && <div className="muted small">продано {o.sold.toLocaleString('ru-RU')}</div>}
+                    {o.store === 'plati.market' && <div className="muted small">+{o.reviews_pos} / −{o.reviews_neg}{o.returns ? `, возвратов ${o.returns}` : ''}</div>}
+                    {o.store === 'plati.market' && <div className="muted small">продано {o.sold.toLocaleString('ru-RU')}</div>}
                   </td>
                   <td className="num price">
                     {price(o)}

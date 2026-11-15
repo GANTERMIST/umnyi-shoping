@@ -90,7 +90,7 @@ def now() -> str:
 
 
 def api_type(store: str) -> str:
-    return "plati" if store == "plati.market" else "cheapshark"
+    return "plati" if store == "plati.market" else "steambuy" if store == "SteamBuy" else "cheapshark"
 
 
 class Database:

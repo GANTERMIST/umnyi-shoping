@@ -190,3 +190,14 @@ class FeedbackStats(BaseModel):
     helpful: int
     helpful_pct: int | None = Field(description="Доля «помогла» — ключевой критерий брифа: не меньше 60%")
     by_place: dict[str, dict[str, int]]
+
+
+class TelegramAuthIn(BaseModel):
+    """Что присылает Telegram Login Widget (https://core.telegram.org/widgets/login)."""
+    id: int
+    first_name: str | None = None
+    last_name: str | None = None
+    username: str | None = None
+    photo_url: str | None = None
+    auth_date: int
+    hash: str = Field(min_length=64, max_length=64)

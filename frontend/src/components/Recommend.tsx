@@ -26,7 +26,7 @@ export function Recommend({ offers, where = 'search', query }: { offers: Offer[]
         </div>
         <div className="rec-buy">
           <div className="big-price">{price(o)}</div>
-          <a className="btn primary" href={o.url} target="_blank" rel="noopener noreferrer">Купить у продавца ↗</a>
+          <a className="btn primary" href={o.url} target="_blank" rel="noopener noreferrer">Купить ↗</a>
           <button className="btn ghost small" onClick={() => toggleFav(o)}>{isFav(o.id) ? 'Отслеживаю цену' : 'Следить за ценой'}</button>
         </div>
       </div>

@@ -66,7 +66,7 @@ export default function App() {
       )}
       <footer className="container footer muted small">
         <span>Умный Шопинг, учебный проект УрФУ</span>
-        <span>Цены: Plati.market и официальные магазины через CheapShark. Данные игр: Steam. Покупка на сайте продавца.</span>
+        <span>Цены: Plati.market, SteamBuy и официальные магазины через CheapShark. Данные игр: Steam. Покупка на сайте продавца.</span>
       </footer>
     </>
   )

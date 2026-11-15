@@ -44,6 +44,7 @@ export default function GamePage() {
       <p className="product-meta" style={{ marginBottom: 12 }}>
         <Link to="/">Главная</Link> / <Link to="/catalog">Каталог</Link> / {g.name}
       </p>
+      <Recommend offers={card.offers} where="game" query={g.name} />
       <section className="product">
         <div className="product-media">{g.image && <img src={g.image} alt={g.name} />}</div>
         <div className="product-info">
@@ -88,8 +89,6 @@ export default function GamePage() {
         })}
         {!bestKinds.length && <p className="muted" style={{ padding: 16, background: 'var(--bg)' }}>Надёжных предложений сейчас нет.</p>}
       </div>
-
-      <Recommend offers={card.offers} where="game" query={g.name} />
 
       {sel && <div className="card"><PriceChart offerId={sel.id} currency={sel.currency} title={`${KIND_LABEL[sel.kind]}, ${sel.kind === 'магазин' ? sel.store : sel.seller}`} /></div>}
 

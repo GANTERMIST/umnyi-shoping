@@ -19,7 +19,7 @@ export default function Search() {
 
   const [kinds, setKinds] = useState<Kind[]>(profile.kinds.length ? profile.kinds : DEFAULT_KINDS)
   const [platforms, setPlatforms] = useState<string[]>([])
-  const [stores, setStores] = useState<'all' | 'plati' | 'official'>('all')
+  const [stores, setStores] = useState<'all' | 'plati' | 'shops' | 'official'>('all')
   const [maxPrice, setMaxPrice] = useState('')
   const [trusted, setTrusted] = useState(true)
   const [regionOk, setRegionOk] = useState(false)
@@ -40,7 +40,7 @@ export default function Search() {
   const offers = useMemo(() => (res?.offers || []).filter(o =>
     kinds.includes(o.kind) &&
     (!platforms.length || platforms.includes(o.platform)) &&
-    (stores === 'all' || (stores === 'plati') === (o.store === 'plati.market')) &&
+    (stores === 'all' || (stores === 'plati' ? o.store === 'plati.market' : stores === 'official' ? o.kind === 'магазин' : o.store !== 'plati.market' && o.kind !== 'магазин')) &&
     (!maxPrice || (o.currency === 'RUB' && o.price <= Number(maxPrice))) &&  // бюджет в рублях
     (!trusted || o.trusted) &&
     (!regionOk || regionFit(o, profile.region) !== 'no')), [res, kinds, platforms, stores, maxPrice, trusted, regionOk, profile.region])
@@ -71,6 +71,7 @@ export default function Search() {
         <select value={stores} onChange={e => setStores(e.target.value as typeof stores)} aria-label="Магазин">
           <option value="all">Все площадки</option>
           <option value="plati">Только Plati.market</option>
+          <option value="shops">Магазины в рублях (SteamBuy)</option>
           <option value="official">Только официальные</option>
         </select>
         <label>Цена до, ₽<input type="number" min={0} value={maxPrice} onChange={e => setMaxPrice(e.target.value)} placeholder={profile.budget ? String(profile.budget) : ''} /></label>
@@ -83,6 +84,7 @@ export default function Search() {
         {err && <div className="error">{err} <button className="btn small" onClick={() => location.reload()}>Повторить</button></div>}
         {res && !loading && (
           <>
+            <Recommend offers={res.offers} where="search" query={q} />
             {res.warnings.map(w => <div key={w} className="notice">{w}</div>)}
             {res.game ? (
               <div className="game-head card">
@@ -98,7 +100,6 @@ export default function Search() {
             <p className="muted small">
               Найдено {res.total_found} предложений, к товару относятся {res.matched}, под фильтры — {offers.length}. Поиск занял {took.toFixed(1)} с.
             </p>
-            <Recommend offers={res.offers} where="search" query={q} />
             <OfferTable offers={offers} appid={res.game?.appid} />
           </>
         )}

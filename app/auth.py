@@ -80,3 +80,31 @@ def user_from_token(db: Database, token: str | None) -> int | None:
 def logout(db: Database, token: str | None) -> None:
     if token:
         db.drop_session(_token_hash(token))
+
+
+# ── вход через Telegram (Telegram Login Widget) ─────────────────
+# Данные виджета подписаны ботом: hash = HMAC-SHA256(data_check_string, SHA256(bot_token)).
+# Без проверки подписи любой мог бы прислать чужой id, поэтому без токена бота вход выключен.
+TG_MAX_AGE = 86400  # подпись действительна сутки
+
+
+def telegram_login(db: Database, data: dict, bot_token: str | None) -> int:
+    if not bot_token:
+        raise AuthError(503, "Вход через Telegram не настроен на сервере")
+    data = {k: str(v) for k, v in data.items() if v is not None}
+    got = data.pop("hash", "")
+    check = "\n".join(f"{k}={data[k]}" for k in sorted(data))
+    want = hmac.new(hashlib.sha256(bot_token.encode()).digest(), check.encode(), hashlib.sha256).hexdigest()
+    if not got or not hmac.compare_digest(want, got):
+        raise AuthError(401, "Подпись Telegram не сошлась")
+    if _now().timestamp() - int(data.get("auth_date", 0)) > TG_MAX_AGE:
+        raise AuthError(401, "Данные Telegram устарели — войдите ещё раз")
+    login_id = f"tg:{int(data['id'])}"  # вместо почты; пароля у такого аккаунта нет
+    name = " ".join(x for x in (data.get("first_name"), data.get("last_name")) if x) or data.get("username")
+    u = db.user_by_email(login_id)
+    if u:
+        return u["id"]
+    uid = db.create_user(login_id, name, "", secrets.token_hex(16))  # пустой хэш: войти паролем нельзя
+    if uid is None:
+        raise AuthError(409, "Не удалось создать аккаунт")
+    return uid

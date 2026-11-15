@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../api'
+import { api, type TelegramUser } from '../api'
 import { useApp } from '../store'
 
 export default function Login() {
@@ -12,6 +12,29 @@ export default function Login() {
   const [name, setName] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // Вход через Telegram: официальный виджет telegram.org, подпись проверяет сервер
+  const tgBox = useRef<HTMLDivElement>(null)
+  const [tgBot, setTgBot] = useState<string | null | undefined>(undefined)
+  useEffect(() => { api.telegramConfig().then(c => setTgBot(c.bot)).catch(() => setTgBot(null)) }, [])
+  useEffect(() => {
+    if (!tgBot || !tgBox.current) return
+    const w = window as unknown as { onTelegramAuth?: (u: TelegramUser) => void }
+    w.onTelegramAuth = async (u: TelegramUser) => {
+      setErr(null); setBusy(true)
+      try { signedIn(await api.telegram(u)); nav('/profile') } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
+    }
+    const s = document.createElement('script')
+    s.src = 'https://telegram.org/js/telegram-widget.js?22'
+    s.async = true
+    s.dataset.telegramLogin = tgBot
+    s.dataset.size = 'large'
+    s.dataset.radius = '0'
+    s.dataset.requestAccess = 'write'
+    s.dataset.onauth = 'onTelegramAuth(user)'
+    tgBox.current.replaceChildren(s)
+    return () => { delete w.onTelegramAuth }
+  }, [tgBot, nav, signedIn])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,6 +57,11 @@ export default function Login() {
       <div className="tabs">
         <button className={mode === 'login' ? 'on' : ''} onClick={() => setMode('login')}>Вход</button>
         <button className={mode === 'register' ? 'on' : ''} onClick={() => setMode('register')}>Регистрация</button>
+      </div>
+      <div className="tg-login">
+        <div ref={tgBox} />
+        {tgBot === null && <p className="muted small">Вход через Telegram появится, когда к сайту подключат бота.</p>}
+        {tgBot && <p className="muted small">{mode === 'register' ? 'Регистрация' : 'Вход'} в один клик через Telegram — без пароля. Или по почте:</p>}
       </div>
       <form onSubmit={submit}>
         {mode === 'register' && <label>Имя<input value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></label>}

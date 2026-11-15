@@ -92,7 +92,10 @@ class Service:
 
     async def _steam_and_official(self, query: str):
         game, exclude = await self._resolve(query)
-        official, warns = (await self.src.official_offers(game)) if game else ([], [])
+        if not game:
+            return game, exclude, [], []
+        (official, warns), shops = await asyncio.gather(self.src.official_offers(game), self.src.steambuy_offers(game))
+        official = shops + official  # магазины с ценой в рублях + официальные в долларах
         return game, exclude, official, warns
 
     async def _collect(self, query: str, fresh: bool = False):
@@ -139,7 +142,7 @@ class Service:
 
         if plati_ok or official:
             pid = self.db.save_game(game) if game else None
-            self.db.save_offers(pid, [o for o in matched if plati_ok or o.kind == "магазин"])
+            self.db.save_offers(pid, [o for o in matched if plati_ok or o.store != "plati.market"])
         result = (game, offers, matched, warnings)
         if plati_ok and offers:  # ошибки не кэшируем
             self.cache.put(key, result)

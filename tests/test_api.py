@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import json
+
 import httpx
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -40,6 +42,7 @@ STEAM_APP = {"1245620": {"success": True, "data": {"name": "ELDEN RING", "genres
 
 CHEAP_DEALS: list = []  # по умолчанию официальные магазины пусты — тесты Plati не меняются
 STATE = {"plati_down": False}
+STEAMBUY: list = []  # по умолчанию SteamBuy пуст; заполняется в SteamBuyTest
 
 
 def handler(request: httpx.Request) -> httpx.Response:
@@ -60,6 +63,9 @@ def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=STEAM_SEARCH if "elden" in term else {"items": []})
     if "appdetails" in url:
         return httpx.Response(200, json=STEAM_APP)
+    if "steambuy.com/catalog" in url:
+        items = STEAMBUY
+        return httpx.Response(200, text="<script>window.initialCatalogData = " + json.dumps({"items": items}) + ";" + chr(10) + "</script>")
     if "appreviews" in url:
         return httpx.Response(200, json={"query_summary": {"total_reviews": 1000, "total_positive": 930}})
     return httpx.Response(404)
@@ -230,6 +236,19 @@ class OfficialStoresTest(Base):
         self.assertEqual(sorted((o.price, o.currency) for o in cur), [(20.0, "USD"), (1890, "RUB")])
 
 
+class SteamBuyTest(Base):
+    async def test_steambuy_matched_by_appid(self):
+        STEAMBUY[:] = [{"id_good": 1, "title": "ELDEN RING", "appid_steam": 1245620, "price": 3799, "price_rrc": 4000,
+                        "nal": 1, "is_gift": True, "catalog_offer_ru": True, "url": "/steam/elden-ring-russia/"},
+                       {"id_good": 2, "title": "ELDEN RING NIGHTREIGN", "appid_steam": 2622380, "price": 1500, "nal": 1}]
+        self.addCleanup(STEAMBUY.clear)
+        r = await self.svc.search("elden ring")
+        sb = [o for o in r.offers if o.store == "SteamBuy"]
+        self.assertEqual(len(sb), 1)  # NIGHTREIGN (другой appid) не попал
+        self.assertEqual((sb[0].price, sb[0].currency, sb[0].kind, sb[0].region), (3799, "RUB", "гифт", "RU"))
+        self.assertTrue(sb[0].url.startswith("https://steambuy.com/steam/"))
+
+
 class OfflineTest(Base):
     async def asyncTearDown(self):
         STATE["plati_down"] = False
@@ -371,6 +390,31 @@ class ApiTest(unittest.TestCase):
         self.client.__exit__(None, None, None)
         self.tmp.cleanup()
         os.environ.pop("DATA_DIR", None)
+
+    def test_telegram_login(self):
+        import hashlib, hmac, time
+        token = "123:TEST"
+        os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_BOT_USERNAME"] = token, "@shop_bot"
+        try:
+            self.assertEqual(self.client.get("/api/auth/telegram/config").json(), {"bot": "shop_bot"})
+            data = {"id": 42, "first_name": "Паша", "username": "pasha", "auth_date": int(time.time())}
+            check = chr(10).join(f"{k}={data[k]}" for k in sorted(data))
+            data["hash"] = hmac.new(hashlib.sha256(token.encode()).digest(), check.encode(), hashlib.sha256).hexdigest()
+            r = self.client.post("/api/auth/telegram", json=data)
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(r.json()["user"]["name"], "Паша")
+            uid = r.json()["user"]["id"]
+            self.assertEqual(self.client.get("/api/me").json()["user"]["id"], uid)
+            self.assertEqual(self.client.post("/api/auth/telegram", json=data).json()["user"]["id"], uid)  # тот же аккаунт
+            bad = dict(data, id=43)  # подмена id — подпись не сходится
+            self.assertEqual(self.client.post("/api/auth/telegram", json=bad).status_code, 401)
+            old = dict(data, auth_date=int(time.time()) - 2 * 86400)
+            self.assertEqual(self.client.post("/api/auth/telegram", json=old).status_code, 401)
+            # у Telegram-аккаунта нет пароля — войти по «почте» tg:42 нельзя
+            self.assertEqual(self.client.post("/api/auth/login", json={"email": "tg:42", "password": "whatever1"}).status_code, 422)
+        finally:
+            os.environ.pop("TELEGRAM_BOT_TOKEN"); os.environ.pop("TELEGRAM_BOT_USERNAME")
+        self.assertEqual(self.client.get("/api/auth/telegram/config").json(), {"bot": None})
 
     def test_auth_flow(self):
         c = self.client

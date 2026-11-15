@@ -184,7 +184,14 @@ export const api = {
   register: (email: string, password: string, name?: string) => req<Me>('/api/auth/register', json({ email, password, name })),
   login: (email: string, password: string) => req<Me>('/api/auth/login', json({ email, password })),
   logout: () => req<{ ok: boolean }>('/api/auth/logout', json({})),
+  telegramConfig: () => req<{ bot: string | null }>('/api/auth/telegram/config'),
+  telegram: (user: TelegramUser) => req<Me>('/api/auth/telegram', json(user)),
   me: () => req<Me>('/api/me'),
   putProfile: (p: Profile) => req<Me>('/api/me/profile', json(p, 'PUT')),
   putFavorites: (f: Favorite[]) => req<Me>('/api/me/favorites', json(f, 'PUT')),
+}
+
+/** Что отдаёт Telegram Login Widget в onauth. */
+export interface TelegramUser {
+  id: number; first_name?: string; last_name?: string; username?: string; photo_url?: string; auth_date: number; hash: string
 }

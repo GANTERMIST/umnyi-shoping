@@ -61,6 +61,7 @@ export function delivery(o: Offer): string {
 /** Условия возврата и гарантии. */
 export function guarantee(o: Offer): string {
   if (o.kind === 'магазин') return 'Возврат по правилам магазина (в Steam — 14 дней, если играли меньше 2 ч)'
+  if (o.store !== 'plati.market') return `Гарантия магазина ${o.store}: замена или возврат, если товар не пришёл или не активировался`
   const r = o.returns ? ` · возвратов у продавца: ${o.returns}` : ''
   return `Гарантия Plati: спор в заказе, деньги вернут, если товар не подошёл${r}`
 }
@@ -78,6 +79,7 @@ export function habits(favorites: Favorite[]): { platform: string | null; kind: 
 
 export function trustLabel(o: Offer): string {
   if (o.kind === 'магазин') return 'Официальный магазин'
+  if (o.store !== 'plati.market') return `Магазин ${o.store}`
   return o.trusted ? `Надёжный, ${Math.round(o.trust_score * 100)}%` : `Мало отзывов, ${Math.round(o.trust_score * 100)}%`
 }
 
@@ -109,7 +111,8 @@ export function recommend(offers: Offer[], profile: Profile, favorites: Favorite
   reasons.push(`тип «${KIND_LABEL[best.kind]}» из вашего списка`)
   const fit = regionFit(best, p.region)
   reasons.push(fit === 'yes' ? `регион подходит (${REGION_LABEL[p.region] ?? p.region})` : 'регион не указан — уточните у продавца')
-  reasons.push(best.kind === 'магазин' ? `официальный магазин ${best.store}` : `надёжный продавец (+${best.reviews_pos} / −${best.reviews_neg})`)
+  reasons.push(best.kind === 'магазин' ? `официальный магазин ${best.store}`
+    : best.store !== 'plati.market' ? `магазин ${best.store}` : `надёжный продавец (+${best.reviews_pos} / −${best.reviews_neg})`)
   reasons.push('самая низкая цена среди подходящих')
   let relaxed: string | null = null
   if (p.platform && !byPlatform.length) relaxed = `Для ${p.platform} подходящих нет — показываю другую платформу.`
