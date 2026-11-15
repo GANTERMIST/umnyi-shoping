@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from './store'
 import Home from './pages/Home'
 import Catalog from './pages/Catalog'
@@ -27,6 +27,7 @@ function SearchBox() {
 export default function App() {
   const { user, compare, changed, reached, theme, setTheme } = useApp()
   const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
   const close = () => setOpen(false)
   return (
     <>
@@ -60,7 +61,7 @@ export default function App() {
           <Route path="*" element={<div className="empty"><h2>Страница не найдена</h2><Link to="/">На главную</Link></div>} />
         </Routes>
       </main>
-      {compare.length > 0 && (
+      {compare.length > 0 && pathname !== '/compare' && (
         <Link to="/compare" className="compare-bar">К сравнению: {compare.length} / 4 — Сравнить →</Link>
       )}
       <footer className="container footer muted small">
